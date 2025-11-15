@@ -235,7 +235,7 @@ class Admin {
     // Get all users
     public function getUsers() {
         try {
-            // Get all users with repository count
+            // Get all users with repository count and verification status
             $sql = "SELECT
                 u.user_id,
                 u.user_name,
@@ -247,6 +247,7 @@ class Admin {
                 u.user_contact,
                 u.user_address,
                 u.created_at,
+                COALESCE(u.is_verified, 0) as is_verified,
                 COUNT(r.id) as repositories_count
             FROM tbl_users u
             LEFT JOIN tbl_repository r ON u.user_id = r.publisher
@@ -270,6 +271,7 @@ class Admin {
                     'position' => $user['user_type'],
                     'createdAt' => $user['created_at'],
                     'repositoriesCount' => (int)$user['repositories_count'],
+                    'isVerified' => (bool)((int)$user['is_verified']),
                     'status' => 'active' // Default status, you can add status field to database if needed
                 ];
             }
@@ -362,6 +364,67 @@ class Admin {
         } catch (PDOException $e) {
             $this->conn->rollBack();
             error_log("Admin updateUser PDO Error: " . $e->getMessage());
+            return json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
+        }
+    }
+
+    // Verify or unverify user
+    public function verifyUser($userId, $isVerified) {
+        try {
+            $this->conn->beginTransaction();
+
+            // Check if user exists
+            $stmt = $this->conn->prepare("SELECT * FROM tbl_users WHERE user_id = :id");
+            $stmt->execute([':id' => (int)$userId]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$user) {
+                $this->conn->rollBack();
+                return json_encode(["status" => "error", "message" => "User not found"]);
+            }
+
+            // Update verification status
+            $sql = "UPDATE tbl_users SET is_verified = :is_verified, updated_at = CURRENT_TIMESTAMP WHERE user_id = :id";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute([
+                ':id' => (int)$userId,
+                ':is_verified' => $isVerified ? 1 : 0
+            ]);
+
+            $this->conn->commit();
+
+            // Fetch updated user
+            $stmt = $this->conn->prepare("
+                SELECT
+                    u.*,
+                    COUNT(r.id) as repositories_count
+                FROM tbl_users u
+                LEFT JOIN tbl_repository r ON u.user_id = r.publisher
+                WHERE u.user_id = :id
+                GROUP BY u.user_id
+            ");
+            $stmt->execute([':id' => (int)$userId]);
+            $updatedUser = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            return json_encode([
+                "status" => "success",
+                "message" => $isVerified ? "User verified successfully" : "User verification removed successfully",
+                "data" => [
+                    'id' => (string)$updatedUser['user_id'],
+                    'name' => $updatedUser['user_name'],
+                    'email' => $updatedUser['user_email'],
+                    'role' => $updatedUser['user_role'],
+                    'institution' => $updatedUser['user_school'],
+                    'department' => $updatedUser['user_department'],
+                    'position' => $updatedUser['user_type'],
+                    'createdAt' => $updatedUser['created_at'],
+                    'repositoriesCount' => (int)$updatedUser['repositories_count'],
+                    'isVerified' => (bool)((int)$updatedUser['is_verified'])
+                ]
+            ]);
+        } catch (PDOException $e) {
+            $this->conn->rollBack();
+            error_log("Admin verifyUser PDO Error: " . $e->getMessage());
             return json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
         }
     }
@@ -556,6 +619,207 @@ class Admin {
             return json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
         }
     }
+
+    // Get all announcements
+    public function getAnnouncements($publishedOnly = false) {
+        try {
+            $sql = "SELECT
+                a.id,
+                a.title,
+                a.content,
+                a.published,
+                a.created_by,
+                a.created_at,
+                a.updated_at,
+                u.user_name AS created_by_name
+            FROM tbl_announcements a
+            INNER JOIN tbl_users u ON a.created_by = u.user_id";
+
+            if ($publishedOnly) {
+                $sql .= " WHERE a.published = 1";
+            }
+
+            $sql .= " ORDER BY a.created_at DESC";
+
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute();
+            $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            return json_encode([
+                "status" => "success",
+                "data" => $announcements
+            ]);
+        } catch (PDOException $e) {
+            error_log("Admin getAnnouncements PDO Error: " . $e->getMessage());
+            return json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
+        }
+    }
+
+    // Create announcement
+    public function createAnnouncement($data) {
+        try {
+            $this->conn->beginTransaction();
+
+            $sql = "INSERT INTO tbl_announcements (title, content, published, created_by)
+                    VALUES (:title, :content, :published, :created_by)";
+
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute([
+                ':title' => $data['title'],
+                ':content' => $data['content'],
+                ':published' => isset($data['published']) ? (int)$data['published'] : 0,
+                ':created_by' => (int)$data['created_by']
+            ]);
+
+            $announcementId = $this->conn->lastInsertId();
+
+            // If published, create notifications for all users
+            if (isset($data['published']) && $data['published']) {
+                $this->createAnnouncementNotifications($announcementId, $data['title'], $data['content']);
+            }
+
+            $this->conn->commit();
+
+            // Fetch the created announcement
+            $stmt = $this->conn->prepare("SELECT
+                a.id,
+                a.title,
+                a.content,
+                a.published,
+                a.created_by,
+                a.created_at,
+                a.updated_at,
+                u.user_name AS created_by_name
+            FROM tbl_announcements a
+            INNER JOIN tbl_users u ON a.created_by = u.user_id
+            WHERE a.id = :id");
+            $stmt->execute([':id' => $announcementId]);
+            $announcement = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            return json_encode([
+                "status" => "success",
+                "message" => "Announcement created successfully",
+                "data" => $announcement
+            ]);
+        } catch (PDOException $e) {
+            $this->conn->rollBack();
+            error_log("Admin createAnnouncement PDO Error: " . $e->getMessage());
+            return json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
+        }
+    }
+
+    // Update announcement
+    public function updateAnnouncement($announcementId, $data) {
+        try {
+            $this->conn->beginTransaction();
+
+            // Get current announcement to check if publishing status changed
+            $stmt = $this->conn->prepare("SELECT published FROM tbl_announcements WHERE id = :id");
+            $stmt->execute([':id' => (int)$announcementId]);
+            $current = $stmt->fetch(PDO::FETCH_ASSOC);
+            $wasPublished = $current['published'];
+            $willBePublished = isset($data['published']) ? (int)$data['published'] : 0;
+
+            $sql = "UPDATE tbl_announcements SET
+                    title = :title,
+                    content = :content,
+                    published = :published,
+                    updated_at = CURRENT_TIMESTAMP
+                    WHERE id = :id";
+
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute([
+                ':title' => $data['title'],
+                ':content' => $data['content'],
+                ':published' => $willBePublished,
+                ':id' => (int)$announcementId
+            ]);
+
+            // If newly published, create notifications for all users
+            if (!$wasPublished && $willBePublished) {
+                $this->createAnnouncementNotifications($announcementId, $data['title'], $data['content']);
+            }
+
+            $this->conn->commit();
+
+            // Fetch the updated announcement
+            $stmt = $this->conn->prepare("SELECT
+                a.id,
+                a.title,
+                a.content,
+                a.published,
+                a.created_by,
+                a.created_at,
+                a.updated_at,
+                u.user_name AS created_by_name
+            FROM tbl_announcements a
+            INNER JOIN tbl_users u ON a.created_by = u.user_id
+            WHERE a.id = :id");
+            $stmt->execute([':id' => (int)$announcementId]);
+            $announcement = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            return json_encode([
+                "status" => "success",
+                "message" => "Announcement updated successfully",
+                "data" => $announcement
+            ]);
+        } catch (PDOException $e) {
+            $this->conn->rollBack();
+            error_log("Admin updateAnnouncement PDO Error: " . $e->getMessage());
+            return json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
+        }
+    }
+
+    // Delete announcement
+    public function deleteAnnouncement($announcementId) {
+        try {
+            $stmt = $this->conn->prepare("DELETE FROM tbl_announcements WHERE id = :id");
+            $stmt->execute([':id' => (int)$announcementId]);
+
+            if ($stmt->rowCount() > 0) {
+                return json_encode([
+                    "status" => "success",
+                    "message" => "Announcement deleted successfully"
+                ]);
+            } else {
+                return json_encode([
+                    "status" => "error",
+                    "message" => "Announcement not found"
+                ]);
+            }
+        } catch (PDOException $e) {
+            error_log("Admin deleteAnnouncement PDO Error: " . $e->getMessage());
+            return json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
+        }
+    }
+
+    // Helper function to create notifications for all users when announcement is published
+    private function createAnnouncementNotifications($announcementId, $title, $content) {
+        try {
+            // Get all users except admins (or include them if you want)
+            $stmt = $this->conn->prepare("SELECT user_id FROM tbl_users");
+            $stmt->execute();
+            $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $notificationSql = "INSERT INTO tbl_notifications (user_id, title, message, type, related_id, related_type)
+                                VALUES (:user_id, :title, :message, 'announcement', :related_id, 'announcement')";
+            $notificationStmt = $this->conn->prepare($notificationSql);
+
+            $shortContent = strlen($content) > 100 ? substr($content, 0, 100) . '...' : $content;
+
+            foreach ($users as $user) {
+                $notificationStmt->execute([
+                    ':user_id' => (int)$user['user_id'],
+                    ':title' => $title,
+                    ':message' => $shortContent,
+                    ':related_id' => (int)$announcementId
+                ]);
+            }
+        } catch (PDOException $e) {
+            error_log("Admin createAnnouncementNotifications PDO Error: " . $e->getMessage());
+            // Don't throw, just log - we don't want to fail the announcement creation
+        }
+    }
 }
 
 // Initialize Admin class
@@ -626,6 +890,39 @@ try {
         case "delete_user":
             $userId = $_POST['user_id'] ?? ($jsonData['user_id'] ?? '');
             echo $admin->deleteUser($userId);
+            break;
+
+        case "verify_user":
+            $userId = $_POST['user_id'] ?? ($jsonData['user_id'] ?? '');
+            $isVerified = isset($_POST['is_verified']) ? (bool)$_POST['is_verified'] : (isset($jsonData['is_verified']) ? (bool)$jsonData['is_verified'] : true);
+            if (empty($userId)) {
+                echo json_encode(["status" => "error", "message" => "User ID is required"]);
+                break;
+            }
+            echo $admin->verifyUser($userId, $isVerified);
+            break;
+
+        case "get_announcements":
+            $publishedOnly = isset($_POST['published_only']) ? (bool)$_POST['published_only'] : (isset($jsonData['published_only']) ? (bool)$jsonData['published_only'] : false);
+            echo $admin->getAnnouncements($publishedOnly);
+            break;
+
+        case "create_announcement":
+            $data = !empty($jsonData) ? $jsonData : $_POST;
+            unset($data['operation']);
+            echo $admin->createAnnouncement($data);
+            break;
+
+        case "update_announcement":
+            $announcementId = $_POST['announcement_id'] ?? ($jsonData['announcement_id'] ?? '');
+            $data = !empty($jsonData) ? $jsonData : $_POST;
+            unset($data['operation'], $data['announcement_id']);
+            echo $admin->updateAnnouncement($announcementId, $data);
+            break;
+
+        case "delete_announcement":
+            $announcementId = $_POST['announcement_id'] ?? ($jsonData['announcement_id'] ?? '');
+            echo $admin->deleteAnnouncement($announcementId);
             break;
 
         default:

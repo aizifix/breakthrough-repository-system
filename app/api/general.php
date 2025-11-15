@@ -19,8 +19,9 @@ class General {
     }
 
     // Get all published repositories (public view)
-    public function getPublishedRepositories($filters = []) {
+    public function getPublishedRepositories($filters = [], $userId = null) {
         try {
+            // Check if is_verified column exists, if not use 0 as default
             $sql = "SELECT
                 r.id,
                 r.title,
@@ -35,9 +36,23 @@ class General {
                 r.publishedDate,
                 r.publishedStatus,
                 r.pdfUrl,
-                r.created_at
+                r.created_at,
+                COALESCE(r.view_count, 0) AS views,
+                COALESCE(like_counts.like_count, 0) AS likes,
+                CASE WHEN user_likes.repository_id IS NOT NULL THEN 1 ELSE 0 END AS is_liked,
+                0 AS publisher_is_verified
             FROM tbl_repository r
             INNER JOIN tbl_users u ON r.publisher = u.user_id
+            LEFT JOIN (
+                SELECT repository_id, COUNT(*) as like_count
+                FROM tbl_repository_likes
+                GROUP BY repository_id
+            ) like_counts ON r.id = like_counts.repository_id
+            LEFT JOIN (
+                SELECT repository_id
+                FROM tbl_repository_likes
+                WHERE user_id = :user_id
+            ) user_likes ON r.id = user_likes.repository_id
             WHERE r.publishedStatus = 'published'";
 
             // Apply filters
@@ -93,10 +108,37 @@ class General {
 
             $sql .= " ORDER BY r.publishedDate DESC, r.created_at DESC";
 
+            // Add userId to params if provided
+            if ($userId) {
+                $params[':user_id'] = (int)$userId;
+            } else {
+                // If no userId, use a value that won't match any user_id (0 or -1)
+                $params[':user_id'] = 0;
+            }
+
             $stmt = $this->conn->prepare($sql);
             $stmt->execute($params);
 
             $repositories = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Double-check: Filter to ONLY include published repositories (safety filter)
+            $repositories = array_filter($repositories, function($repo) {
+                return strtolower($repo['publishedStatus'] ?? '') === 'published';
+            });
+
+            // Try to get verification status separately if column exists
+            $verificationMap = [];
+            try {
+                $verifyStmt = $this->conn->prepare("SELECT user_id, COALESCE(is_verified, 0) as is_verified FROM tbl_users");
+                $verifyStmt->execute();
+                $verifications = $verifyStmt->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($verifications as $v) {
+                    $verificationMap[$v['user_id']] = (bool)((int)$v['is_verified']);
+                }
+            } catch (PDOException $e) {
+                // Column doesn't exist, use default false for all
+                error_log("is_verified column may not exist: " . $e->getMessage());
+            }
 
             // Format category and tags as arrays
             foreach ($repositories as &$repo) {
@@ -107,7 +149,19 @@ class General {
                 if (empty($repo['publishedDate'])) {
                     $repo['publishedDate'] = date('Y-m-d', strtotime($repo['created_at']));
                 }
+
+                // Format numeric fields (default to 0 if not available)
+                $repo['views'] = (int)($repo['views'] ?? 0);
+                $repo['likes'] = (int)($repo['likes'] ?? 0);
+                $repo['isLiked'] = (bool)((int)($repo['is_liked'] ?? 0));
+                $repo['rating'] = round((float)($repo['rating'] ?? 0), 2);
+                $repo['rating_count'] = (int)($repo['rating_count'] ?? 0);
+                // Get verification status from map or default to false
+                $repo['publisher_is_verified'] = $verificationMap[$repo['publisher']] ?? false;
             }
+
+            // Re-index array after filtering
+            $repositories = array_values($repositories);
 
             return json_encode([
                 "status" => "success",
@@ -136,7 +190,9 @@ class General {
                 r.publishedDate,
                 r.publishedStatus,
                 r.pdfUrl,
-                r.created_at
+                r.created_at,
+                COALESCE(r.view_count, 0) AS views,
+                COALESCE(u.is_verified, 0) AS publisher_is_verified
             FROM tbl_repository r
             INNER JOIN tbl_users u ON r.publisher = u.user_id
             WHERE r.id = :id AND r.publishedStatus = 'published'";
@@ -148,6 +204,21 @@ class General {
 
             if (!$repository) {
                 return json_encode(["status" => "error", "message" => "Repository not found or not published"]);
+            }
+
+            $repository['views'] = (int)($repository['views'] ?? 0);
+
+            // Try to get verification status
+            $publisherId = $repository['publisher'];
+            try {
+                $verifyStmt = $this->conn->prepare("SELECT COALESCE(is_verified, 0) as is_verified FROM tbl_users WHERE user_id = :id");
+                $verifyStmt->execute([':id' => (int)$publisherId]);
+                $verifyResult = $verifyStmt->fetch(PDO::FETCH_ASSOC);
+                $repository['publisher_is_verified'] = $verifyResult ? (bool)((int)$verifyResult['is_verified']) : false;
+            } catch (PDOException $e) {
+                // Column doesn't exist, use default false
+                error_log("is_verified column may not exist: " . $e->getMessage());
+                $repository['publisher_is_verified'] = false;
             }
 
             // Format category and tags as arrays
@@ -165,6 +236,37 @@ class General {
             ]);
         } catch (PDOException $e) {
             error_log("General getRepositoryById PDO Error: " . $e->getMessage());
+            return json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
+        }
+    }
+
+    // Get published announcements (public view)
+    public function getPublishedAnnouncements() {
+        try {
+            $sql = "SELECT
+                a.id,
+                a.title,
+                a.content,
+                a.published,
+                a.created_by,
+                a.created_at,
+                a.updated_at,
+                u.user_name AS created_by_name
+            FROM tbl_announcements a
+            INNER JOIN tbl_users u ON a.created_by = u.user_id
+            WHERE a.published = 1
+            ORDER BY a.created_at DESC";
+
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute();
+            $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            return json_encode([
+                "status" => "success",
+                "data" => $announcements
+            ]);
+        } catch (PDOException $e) {
+            error_log("General getPublishedAnnouncements PDO Error: " . $e->getMessage());
             return json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
         }
     }
@@ -196,6 +298,7 @@ try {
     switch ($operation) {
         case "get_repositories":
             $filters = [];
+            $userId = null;
             if (!empty($jsonData)) {
                 $filters = [
                     'categories' => $jsonData['categories'] ?? [],
@@ -203,6 +306,7 @@ try {
                     'yearFrom' => $jsonData['yearFrom'] ?? '',
                     'yearTo' => $jsonData['yearTo'] ?? ''
                 ];
+                $userId = $jsonData['user_id'] ?? $jsonData['userId'] ?? null;
             } else {
                 $filters = [
                     'categories' => $_POST['categories'] ?? $_GET['categories'] ?? [],
@@ -210,13 +314,18 @@ try {
                     'yearFrom' => $_POST['yearFrom'] ?? $_GET['yearFrom'] ?? '',
                     'yearTo' => $_POST['yearTo'] ?? $_GET['yearTo'] ?? ''
                 ];
+                $userId = $_POST['user_id'] ?? $_POST['userId'] ?? $_GET['user_id'] ?? $_GET['userId'] ?? null;
             }
-            echo $general->getPublishedRepositories($filters);
+            echo $general->getPublishedRepositories($filters, $userId);
             break;
 
         case "get_repository":
             $repositoryId = $_POST['repository_id'] ?? $_GET['repository_id'] ?? ($jsonData['repository_id'] ?? '');
             echo $general->getRepositoryById($repositoryId);
+            break;
+
+        case "get_announcements":
+            echo $general->getPublishedAnnouncements();
             break;
 
         default:

@@ -374,7 +374,7 @@ export default function RepositorySocialFeatures({
           disabled={!user || !userId}
           className="gap-2"
         >
-          <Heart size={18} className={likeData?.isLiked ? "fill-red-500 text-red-500" : ""} />
+          <Heart size={18} className={likeData?.isLiked ? "fill-primary text-primary" : ""} />
           {likeData?.likeCount || 0} Like{likeData && likeData.likeCount !== 1 ? "s" : ""}
         </Button>
         <Button variant="outline" onClick={handleShare} className="gap-2">

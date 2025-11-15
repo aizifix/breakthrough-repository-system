@@ -9,7 +9,7 @@ import {
   DialogFooter,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Download, X } from "lucide-react"
+import { Download, X, CheckCircle2 } from "lucide-react"
 
 interface RepositoryViewModalProps {
   open: boolean
@@ -21,6 +21,7 @@ interface RepositoryViewModalProps {
     publisher: {
       name: string
       avatar: string
+      isVerified?: boolean
     }
     category: string[]
     tags: string[]
@@ -94,9 +95,14 @@ export default function RepositoryViewModal({
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-foreground text-sm truncate">
-                    {repository.publisher.name}
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-semibold text-foreground text-sm truncate">
+                      {repository.publisher.name}
+                    </p>
+                    {repository.publisher.isVerified && (
+                      <CheckCircle2 size={14} className="text-primary flex-shrink-0" title="Verified user" />
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">{repository.publishedDate || "Not published"}</p>
                 </div>
               </div>

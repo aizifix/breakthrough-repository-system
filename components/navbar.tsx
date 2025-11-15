@@ -20,14 +20,17 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
+import { getNotifications, getUnreadCount, markNotificationAsRead, markAllNotificationsAsRead } from "@/app/config/api"
 
 interface Notification {
-  id: string
+  id: string | number
   title: string
   message: string
   time: string
   read: boolean
-  type?: "info" | "success" | "warning" | "error"
+  type?: "info" | "success" | "warning" | "error" | "announcement"
+  related_id?: number
+  related_type?: string
 }
 
 export default function Navbar({
@@ -40,67 +43,131 @@ export default function Navbar({
   const [isOpen, setIsOpen] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
   const router = useRouter()
 
-  // Load notifications from localStorage
+  // Load notifications from API
   useEffect(() => {
     if (typeof window !== "undefined" && user) {
-      const stored = localStorage.getItem(`notifications_${user.name}`)
-      if (stored) {
-        setNotifications(JSON.parse(stored))
-      } else {
-        // Initialize with sample notifications
-        const sampleNotifications: Notification[] = [
-          {
-            id: "1",
-            title: "Repository Approved",
-            message: "Your research paper has been approved and published.",
-            time: "2 hours ago",
-            read: false,
-            type: "success",
-          },
-          {
-            id: "2",
-            title: "New Comment",
-            message: "Someone commented on your repository.",
-            time: "5 hours ago",
-            read: false,
-            type: "info",
-          },
-        ]
-        setNotifications(sampleNotifications)
-        localStorage.setItem(`notifications_${user.name}`, JSON.stringify(sampleNotifications))
-      }
+      loadNotifications()
+      loadUnreadCount()
+
+      // Refresh notifications every 30 seconds
+      const interval = setInterval(() => {
+        loadNotifications()
+        loadUnreadCount()
+      }, 30000)
+
+      return () => clearInterval(interval)
     }
   }, [user])
 
-  const unreadCount = notifications.filter((n) => !n.read).length
+  const loadNotifications = async () => {
+    if (!user) return
 
-  const markAsRead = (id: string) => {
-    setNotifications((prev) => {
-      const updated = prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-      if (user && typeof window !== "undefined") {
-        localStorage.setItem(`notifications_${user.name}`, JSON.stringify(updated))
+    try {
+      // Get user ID from localStorage
+      const stored = localStorage.getItem("user")
+      if (!stored) return
+
+      const userData = JSON.parse(stored)
+      const userId = userData.userId || userData.user_id
+      if (!userId) return
+
+      const response = await getNotifications(userId, false)
+      if (response.status === "success" && response.data) {
+        setNotifications(response.data.map((notif: any) => ({
+          id: notif.id,
+          title: notif.title,
+          message: notif.message,
+          time: notif.time,
+          read: notif.read,
+          type: notif.type || "info",
+          related_id: notif.related_id,
+          related_type: notif.related_type,
+        })))
       }
-      return updated
-    })
+    } catch (error) {
+      console.error("Error loading notifications:", error)
+    }
   }
 
-  const markAllAsRead = () => {
-    setNotifications((prev) => {
-      const updated = prev.map((n) => ({ ...n, read: true }))
-      if (user && typeof window !== "undefined") {
-        localStorage.setItem(`notifications_${user.name}`, JSON.stringify(updated))
+  const loadUnreadCount = async () => {
+    if (!user) return
+
+    try {
+      const stored = localStorage.getItem("user")
+      if (!stored) return
+
+      const userData = JSON.parse(stored)
+      const userId = userData.userId || userData.user_id
+      if (!userId) return
+
+      const response = await getUnreadCount(userId)
+      if (response.status === "success") {
+        setUnreadCount(response.count || 0)
       }
-      return updated
-    })
+    } catch (error) {
+      console.error("Error loading unread count:", error)
+    }
+  }
+
+  const markAsRead = async (id: string | number) => {
+    if (!user) return
+
+    try {
+      const stored = localStorage.getItem("user")
+      if (!stored) return
+
+      const userData = JSON.parse(stored)
+      const userId = userData.userId || userData.user_id
+      if (!userId) return
+
+      await markNotificationAsRead(Number(id), userId)
+
+      // Update local state
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)))
+      setUnreadCount((prev) => Math.max(0, prev - 1))
+    } catch (error) {
+      console.error("Error marking notification as read:", error)
+    }
+  }
+
+  const markAllAsRead = async () => {
+    if (!user) return
+
+    try {
+      const stored = localStorage.getItem("user")
+      if (!stored) return
+
+      const userData = JSON.parse(stored)
+      const userId = userData.userId || userData.user_id
+      if (!userId) return
+
+      await markAllNotificationsAsRead(userId)
+
+      // Update local state
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+      setUnreadCount(0)
+    } catch (error) {
+      console.error("Error marking all as read:", error)
+    }
   }
 
   const handleLogout = () => {
     if (typeof window !== "undefined") {
       localStorage.removeItem("user")
+      // Clear all user-related data
+      const keys = Object.keys(localStorage)
+      keys.forEach(key => {
+        if (key.startsWith("savedRepositories_") || key.startsWith("notifications_") || key.startsWith("adminAnnouncements")) {
+          localStorage.removeItem(key)
+        }
+      })
       // Dispatch custom event to notify other components
       window.dispatchEvent(new Event("userLogout"))
+      // Replace history to prevent back button navigation
+      window.history.replaceState(null, "", "/")
       router.push("/")
       // Force a refresh to update the UI
       setTimeout(() => {
@@ -110,12 +177,12 @@ export default function Navbar({
   }
 
   return (
-    <nav className="sticky top-0 z-50 w-full bg-card border-b border-border">
+    <nav className="sticky top-0 z-50 w-full bg-card border-b border-border h-16 flex items-center">
       <div className={cn(
-        "mx-auto",
+        "mx-auto w-full",
         hideLogo ? "px-4" : "max-w-7xl px-4 sm:px-6 lg:px-8"
       )}>
-        <div className="flex justify-between items-center h-16">
+        <div className="flex justify-between items-center h-full">
           {/* Logo */}
           {!hideLogo && (
             <Link href="/" className="flex items-center gap-2 font-bold text-xl text-primary">
@@ -135,9 +202,9 @@ export default function Navbar({
                   Home
                 </Button>
               </Link>
-              <Link href="/browse">
+              <Link href="/repositories">
                 <Button variant="ghost" size="sm">
-                  Browse
+                  Repositories
                 </Button>
               </Link>
               <Link href="/about">
@@ -322,9 +389,9 @@ export default function Navbar({
                     Home
                   </Button>
                 </Link>
-                <Link href="/browse">
+                <Link href="/repositories">
                   <Button variant="ghost" size="sm" className="w-full justify-start">
-                    Browse
+                    Repositories
                   </Button>
                 </Link>
                 <Link href="/about">

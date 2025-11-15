@@ -89,6 +89,7 @@ export interface User {
   user_type?: string;
   user_contact?: string;
   user_address?: string;
+  user_unique_id?: string;
 }
 
 // ============================================
@@ -129,6 +130,17 @@ export const logout = async (userId: number): Promise<ApiResponse> => {
   return response.data;
 };
 
+/**
+ * Get user profile by user ID
+ */
+export const getUserProfile = async (userId: number): Promise<ApiResponse<User>> => {
+  const response: AxiosResponse<ApiResponse<User>> = await apiClient.post('/auth.php', {
+    operation: 'get_user_profile',
+    user_id: userId,
+  });
+  return response.data;
+};
+
 // ============================================
 // PUBLISHER API
 // ============================================
@@ -136,10 +148,12 @@ export const logout = async (userId: number): Promise<ApiResponse> => {
 /**
  * Get publisher repositories
  */
-export const getPublisherRepositories = async (userId?: number): Promise<ApiResponse> => {
+export const getPublisherRepositories = async (userId?: number, currentUserId?: number): Promise<ApiResponse> => {
   const response: AxiosResponse<ApiResponse> = await apiClient.post('/publisher.php', {
     operation: 'get_repositories',
     user_id: userId,
+    current_user_id: currentUserId,
+    userId: currentUserId,
   });
   return response.data;
 };
@@ -262,6 +276,18 @@ export const deleteUser = async (userId: number): Promise<ApiResponse> => {
 };
 
 /**
+ * Verify or unverify user
+ */
+export const verifyUser = async (userId: number, isVerified: boolean): Promise<ApiResponse> => {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/admin.php', {
+    operation: 'verify_user',
+    user_id: userId,
+    is_verified: isVerified,
+  });
+  return response.data;
+};
+
+/**
  * Get repositories for moderation
  */
 export const getRepositoriesForModeration = async (): Promise<ApiResponse> => {
@@ -333,10 +359,12 @@ export const getPublishers = async (): Promise<ApiResponse> => {
 /**
  * Get all repositories (public)
  */
-export const getAllRepositories = async (filters?: any): Promise<ApiResponse> => {
+export const getAllRepositories = async (filters?: any, userId?: number): Promise<ApiResponse> => {
   const response: AxiosResponse<ApiResponse> = await apiClient.post('/general.php', {
     operation: 'get_repositories',
     ...filters,
+    user_id: userId,
+    userId: userId,
   });
   return response.data;
 };
@@ -371,9 +399,21 @@ export const searchRepositories = async (query: string, filters?: any): Promise<
 /**
  * Get user notifications
  */
-export const getNotifications = async (userId: number): Promise<ApiResponse> => {
+export const getNotifications = async (userId: number, unreadOnly: boolean = false): Promise<ApiResponse> => {
   const response: AxiosResponse<ApiResponse> = await apiClient.post('/notifications.php', {
     operation: 'get_notifications',
+    user_id: userId,
+    unread_only: unreadOnly,
+  });
+  return response.data;
+};
+
+/**
+ * Get unread notification count
+ */
+export const getUnreadCount = async (userId: number): Promise<ApiResponse> => {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/notifications.php', {
+    operation: 'get_unread_count',
     user_id: userId,
   });
   return response.data;
@@ -382,10 +422,11 @@ export const getNotifications = async (userId: number): Promise<ApiResponse> => 
 /**
  * Mark notification as read
  */
-export const markNotificationAsRead = async (notificationId: number): Promise<ApiResponse> => {
+export const markNotificationAsRead = async (notificationId: number, userId: number): Promise<ApiResponse> => {
   const response: AxiosResponse<ApiResponse> = await apiClient.post('/notifications.php', {
-    operation: 'mark_read',
+    operation: 'mark_as_read',
     notification_id: notificationId,
+    user_id: userId,
   });
   return response.data;
 };
@@ -395,19 +436,70 @@ export const markNotificationAsRead = async (notificationId: number): Promise<Ap
  */
 export const markAllNotificationsAsRead = async (userId: number): Promise<ApiResponse> => {
   const response: AxiosResponse<ApiResponse> = await apiClient.post('/notifications.php', {
-    operation: 'mark_all_read',
+    operation: 'mark_all_as_read',
     user_id: userId,
   });
   return response.data;
 };
 
+// ============================================
+// ANNOUNCEMENTS API
+// ============================================
+
 /**
- * Delete notification
+ * Get announcements
+ * For published announcements (public), use general.php
+ * For all announcements (admin), use admin.php
  */
-export const deleteNotification = async (notificationId: number): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/notifications.php', {
-    operation: 'delete_notification',
-    notification_id: notificationId,
+export const getAnnouncements = async (publishedOnly: boolean = false): Promise<ApiResponse> => {
+  // Use general.php for public published announcements, admin.php for admin operations
+  const endpoint = publishedOnly ? '/general.php' : '/admin.php';
+  const response: AxiosResponse<ApiResponse> = await apiClient.post(endpoint, {
+    operation: 'get_announcements',
+    published_only: publishedOnly,
+  });
+  return response.data;
+};
+
+/**
+ * Create announcement
+ */
+export const createAnnouncement = async (data: {
+  title: string;
+  content: string;
+  published: boolean;
+  created_by: number;
+}): Promise<ApiResponse> => {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/admin.php', {
+    operation: 'create_announcement',
+    ...data,
+  });
+  return response.data;
+};
+
+/**
+ * Update announcement
+ */
+export const updateAnnouncement = async (announcementId: number, data: {
+  title: string;
+  content: string;
+  published: boolean;
+}): Promise<ApiResponse> => {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/admin.php', {
+    operation: 'update_announcement',
+    announcement_id: announcementId,
+    ...data,
+  });
+  return response.data;
+};
+
+/**
+ * Delete announcement
+ */
+export const deleteAnnouncement = async (announcementId: number): Promise<ApiResponse> => {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/admin.php', {
+    operation: 'delete_announcement',
+    announcement_id: announcementId,
   });
   return response.data;
 };

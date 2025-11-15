@@ -8,6 +8,7 @@ import FilterPanel, { type FilterState } from "@/components/filter-panel"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Menu, Search, Bookmark, BookmarkCheck } from "lucide-react"
+import { getAllRepositories } from "@/app/config/api"
 
 // Static repositories from home page (for reference)
 const STATIC_REPOSITORIES = [
@@ -18,7 +19,7 @@ const STATIC_REPOSITORIES = [
       "This paper presents a comprehensive survey of deep learning techniques applied to medical image analysis, covering architectures, datasets, and clinical applications across multiple imaging modalities.",
     publisher: { name: "Dr. Sarah Chen", avatar: "SC" },
     category: ["Artificial Intelligence", "Machine Learning"],
-    tags: ["deep-learning", "medical-imaging", "neural-networks"],
+    keywords: ["deep-learning", "medical-imaging", "neural-networks"],
     publishedDate: "2024-01-15",
     publishedStatus: "published" as const,
     pdfUrl: "/mock/Document1.pdf",
@@ -118,7 +119,7 @@ interface Repository {
     avatar: string
   }
   category: string[]
-  tags: string[]
+  keywords: string[]
   publishedDate: string
   publishedStatus: "published" | "draft" | "unpublished"
   pdfUrl?: string
@@ -137,7 +138,6 @@ export default function SavedRepositoriesPage() {
     researchTypes: [],
     yearFrom: "",
     yearTo: "",
-    categories: [],
     keywords: "",
   })
   const [searchQuery, setSearchQuery] = useState("")
@@ -146,33 +146,124 @@ export default function SavedRepositoriesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Load user and saved repositories from localStorage
+  // Load user and saved repositories from localStorage and API
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("user")
-      if (stored) {
-        const userData = JSON.parse(stored)
-        setUser(userData)
+    const loadData = async () => {
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem("user")
+        if (stored) {
+          const userData = JSON.parse(stored)
+          setUser(userData)
 
-        // Load saved repository IDs for this user
-        const savedKey = `savedRepositories_${userData.email}`
-        const savedIds = localStorage.getItem(savedKey)
-        if (savedIds) {
-          setSavedRepositoryIds(JSON.parse(savedIds))
+          // Load saved repository IDs for this user
+          const savedKey = `savedRepositories_${userData.email}`
+          const savedIds = localStorage.getItem(savedKey)
+          if (savedIds) {
+            setSavedRepositoryIds(JSON.parse(savedIds))
+          }
+
+          try {
+            // Fetch repositories from API
+            // Get userId if user is logged in
+            const userId = userData.userId || userData.user_id
+            const apiResponse = await getAllRepositories({
+              categories: [],
+              yearFrom: "",
+              yearTo: "",
+            }, userId)
+
+            let apiRepos: Repository[] = []
+            if (apiResponse.status === "success" && apiResponse.data) {
+              // Transform API response to match frontend format
+              // Filter to ONLY show published repositories (safety check)
+              apiRepos = apiResponse.data
+                .filter((repo: any) => repo.publishedStatus?.toLowerCase() === 'published')
+                .map((repo: any) => {
+                  const avatar = repo.publisher_name
+                    .split(" ")
+                    .map((n: string) => n[0])
+                    .join("")
+                    .toUpperCase()
+                    .slice(0, 2)
+
+                  return {
+                    id: String(repo.id),
+                    title: repo.title,
+                    abstract: repo.abstract,
+                    publisher: {
+                      name: repo.publisher_name,
+                      avatar: avatar,
+                      isVerified: repo.publisher_is_verified ?? false,
+                    },
+                    category: Array.isArray(repo.category) ? repo.category : [],
+                    keywords: Array.isArray(repo.tags) ? repo.tags : [],
+                    publishedDate: repo.publishedDate || new Date().toISOString().split("T")[0],
+                    publishedStatus: repo.publishedStatus as "published" | "draft" | "unpublished",
+                    pdfUrl: repo.pdfUrl || undefined,
+                  views: repo.views ?? 0,
+                  likes: repo.likes ?? 0,
+                  isLiked: repo.isLiked ?? false,
+                  rating: repo.rating ?? 0,
+                  ratingCount: repo.rating_count ?? 0,
+                }
+              })
+            }
+
+            // Load all repositories from localStorage and merge with static repositories
+            const storedRepos = localStorage.getItem("userRepositories")
+            const userRepos = storedRepos ? JSON.parse(storedRepos) : []
+            // Normalize repositories: convert tags to keywords if needed
+            const normalizedUserRepos = userRepos.map((repo: any) => ({
+              ...repo,
+              keywords: repo.keywords || repo.tags || [],
+            }))
+
+            // Merge all repositories: API repos, static repos, and localStorage repos
+            // Remove duplicates by ID (prioritize API repos, then localStorage, then static)
+            const repoMap = new Map<string, Repository>()
+
+            // First add static repositories
+            STATIC_REPOSITORIES.forEach((repo) => {
+              const normalized = {
+                ...repo,
+                keywords: repo.keywords || repo.tags || [],
+              }
+              repoMap.set(repo.id, normalized)
+            })
+
+            // Then add localStorage repositories (will overwrite static if same ID)
+            normalizedUserRepos.forEach((repo: any) => {
+              repoMap.set(repo.id, repo)
+            })
+
+            // Finally add API repos (will overwrite others if same ID)
+            apiRepos.forEach((repo) => {
+              repoMap.set(repo.id, repo)
+            })
+
+            const allRepos = Array.from(repoMap.values())
+            setAllRepositories(allRepos)
+          } catch (error) {
+            console.error("Error fetching repositories:", error)
+            // Fallback to just static and localStorage repos
+            const storedRepos = localStorage.getItem("userRepositories")
+            const userRepos = storedRepos ? JSON.parse(storedRepos) : []
+            const normalizedUserRepos = userRepos.map((repo: any) => ({
+              ...repo,
+              keywords: repo.keywords || repo.tags || [],
+            }))
+            const allRepos = [...STATIC_REPOSITORIES, ...normalizedUserRepos]
+            setAllRepositories(allRepos)
+          }
+        } else {
+          // No user found, redirect to login
+          router.push("/auth/login")
         }
-
-        // Load all repositories from localStorage and merge with static repositories
-        const storedRepos = localStorage.getItem("userRepositories")
-        const userRepos = storedRepos ? JSON.parse(storedRepos) : []
-        // Merge static repositories with user-created repositories
-        const allRepos = [...STATIC_REPOSITORIES, ...userRepos]
-        setAllRepositories(allRepos)
-      } else {
-        // No user found, redirect to login
-        router.push("/auth/login")
+        setIsLoading(false)
       }
-      setIsLoading(false)
     }
+
+    loadData()
   }, [router])
 
   // Update saved repositories when IDs or all repositories change
@@ -188,7 +279,7 @@ export default function SavedRepositoriesPage() {
   // Listen for storage changes (when repositories are saved/unsaved)
   useEffect(() => {
     if (typeof window !== "undefined" && user) {
-      const handleStorageChange = () => {
+      const handleStorageChange = async () => {
         const userData = JSON.parse(localStorage.getItem("user") || "{}")
         if (userData.email) {
           // Reload saved repository IDs
@@ -200,12 +291,99 @@ export default function SavedRepositoriesPage() {
             setSavedRepositoryIds([])
           }
 
-          // Reload all repositories from localStorage and merge with static repositories
-          const storedRepos = localStorage.getItem("userRepositories")
-          const userRepos = storedRepos ? JSON.parse(storedRepos) : []
-          // Merge static repositories with user-created repositories
-          const allRepos = [...STATIC_REPOSITORIES, ...userRepos]
-          setAllRepositories(allRepos)
+          try {
+            // Fetch repositories from API
+            // Get userId if user is logged in
+            const userId = userData.userId || userData.user_id
+            const apiResponse = await getAllRepositories({
+              categories: [],
+              yearFrom: "",
+              yearTo: "",
+            }, userId)
+
+            let apiRepos: Repository[] = []
+            if (apiResponse.status === "success" && apiResponse.data) {
+              // Transform API response to match frontend format
+              // Filter to ONLY show published repositories (safety check)
+              apiRepos = apiResponse.data
+                .filter((repo: any) => repo.publishedStatus?.toLowerCase() === 'published')
+                .map((repo: any) => {
+                  const avatar = repo.publisher_name
+                    .split(" ")
+                    .map((n: string) => n[0])
+                    .join("")
+                    .toUpperCase()
+                    .slice(0, 2)
+
+                  return {
+                    id: String(repo.id),
+                    title: repo.title,
+                    abstract: repo.abstract,
+                    publisher: {
+                      name: repo.publisher_name,
+                      avatar: avatar,
+                      isVerified: repo.publisher_is_verified ?? false,
+                    },
+                    category: Array.isArray(repo.category) ? repo.category : [],
+                    keywords: Array.isArray(repo.tags) ? repo.tags : [],
+                    publishedDate: repo.publishedDate || new Date().toISOString().split("T")[0],
+                    publishedStatus: repo.publishedStatus as "published" | "draft" | "unpublished",
+                    pdfUrl: repo.pdfUrl || undefined,
+                  views: repo.views ?? 0,
+                  likes: repo.likes ?? 0,
+                  isLiked: repo.isLiked ?? false,
+                  rating: repo.rating ?? 0,
+                  ratingCount: repo.rating_count ?? 0,
+                }
+              })
+            }
+
+            // Reload all repositories from localStorage and merge with static repositories
+            const storedRepos = localStorage.getItem("userRepositories")
+            const userRepos = storedRepos ? JSON.parse(storedRepos) : []
+            // Normalize repositories: convert tags to keywords if needed
+            const normalizedUserRepos = userRepos.map((repo: any) => ({
+              ...repo,
+              keywords: repo.keywords || repo.tags || [],
+            }))
+
+            // Merge all repositories: API repos, static repos, and localStorage repos
+            // Remove duplicates by ID (prioritize API repos, then localStorage, then static)
+            const repoMap = new Map<string, Repository>()
+
+            // First add static repositories
+            STATIC_REPOSITORIES.forEach((repo) => {
+              const normalized = {
+                ...repo,
+                keywords: repo.keywords || repo.tags || [],
+              }
+              repoMap.set(repo.id, normalized)
+            })
+
+            // Then add localStorage repositories (will overwrite static if same ID)
+            normalizedUserRepos.forEach((repo: any) => {
+              repoMap.set(repo.id, repo)
+            })
+
+            // Finally add API repos (will overwrite others if same ID)
+            apiRepos.forEach((repo) => {
+              repoMap.set(repo.id, repo)
+            })
+
+            const allRepos = Array.from(repoMap.values())
+            setAllRepositories(allRepos)
+          } catch (error) {
+            console.error("Error fetching repositories:", error)
+            // Fallback to just static and localStorage repos
+            const storedRepos = localStorage.getItem("userRepositories")
+            const userRepos = storedRepos ? JSON.parse(storedRepos) : []
+            const normalizedUserRepos = userRepos.map((repo: any) => ({
+              ...repo,
+              keywords: repo.keywords || repo.tags || [],
+            }))
+            const allRepos = [...STATIC_REPOSITORIES, ...normalizedUserRepos]
+            setAllRepositories(allRepos)
+          }
         }
       }
 
@@ -232,18 +410,11 @@ export default function SavedRepositoriesPage() {
         const matches =
           repo.title.toLowerCase().includes(query) ||
           repo.abstract.toLowerCase().includes(query) ||
-          repo.tags.some((tag) => tag.toLowerCase().includes(query)) ||
+          repo.keywords.some((keyword) => keyword.toLowerCase().includes(query)) ||
           repo.category.some((cat) => cat.toLowerCase().includes(query))
         if (!matches) return false
       }
 
-      // Filter by category
-      if (filters.categories.length > 0) {
-        const hasCategoryMatch = filters.categories.some((cat) =>
-          repo.category.includes(cat)
-        )
-        if (!hasCategoryMatch) return false
-      }
 
       // Filter by year range
       if (filters.yearFrom || filters.yearTo) {
@@ -280,11 +451,11 @@ export default function SavedRepositoriesPage() {
         {/* Header Section */}
         <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-2">
-              <BookmarkCheck size={32} className="text-primary" />
+            <h1 className="text-2xl font-bold text-foreground mb-2 flex items-center gap-2">
+              <BookmarkCheck size={24} className="text-primary" />
               Saved Repositories
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               View and manage your saved research repositories
             </p>
           </div>
@@ -358,10 +529,15 @@ export default function SavedRepositoriesPage() {
                     abstract={repo.abstract}
                     publisher={repo.publisher}
                     category={repo.category}
-                    tags={repo.tags}
+                    tags={repo.keywords}
                     publishedDate={repo.publishedDate}
                     publishedStatus={repo.publishedStatus}
                     pdfUrl={repo.pdfUrl}
+                    views={repo.views}
+                    likes={repo.likes}
+                    isLiked={repo.isLiked}
+                    rating={repo.rating}
+                    ratingCount={repo.ratingCount}
                     user={user}
                     detailPath="/research"
                     onViewClick={() => {
@@ -394,7 +570,7 @@ export default function SavedRepositoriesPage() {
               </div>
             ) : (
               <div className="text-center py-12">
-                <p className="text-lg text-muted-foreground mb-2">No repositories found</p>
+                <p className="text-sm text-muted-foreground mb-2">No repositories found</p>
                 <p className="text-sm text-muted-foreground">
                   Try adjusting your filters or search terms
                 </p>

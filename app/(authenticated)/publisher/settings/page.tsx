@@ -215,11 +215,11 @@ export default function SettingsPage() {
 
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-2">
-            <SettingsIcon size={32} className="text-primary" />
+          <h1 className="text-2xl font-bold text-foreground mb-2 flex items-center gap-2">
+            <SettingsIcon size={24} className="text-primary" />
             Settings
           </h1>
-          <p className="text-muted-foreground">Manage your account settings and preferences</p>
+          <p className="text-sm text-muted-foreground">Manage your account settings and preferences</p>
         </div>
 
         {/* Settings Sections */}

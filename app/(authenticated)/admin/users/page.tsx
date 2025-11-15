@@ -37,6 +37,9 @@ import {
   Mail,
   Building2,
   Menu,
+  MoreVertical,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react"
 import {
   Dialog,
@@ -55,7 +58,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { getUsers, updateUser, deleteUser } from "@/app/config/api"
+import { getUsers, updateUser, deleteUser, verifyUser } from "@/app/config/api"
 
 interface User {
   id: string
@@ -70,6 +73,7 @@ interface User {
   lastLogin?: string
   status: "active" | "inactive" | "suspended"
   repositoriesCount?: number
+  isVerified?: boolean
 }
 
 export default function UsersPage() {
@@ -134,6 +138,7 @@ export default function UsersPage() {
           createdAt: user.createdAt,
           status: user.status || "active",
           repositoriesCount: user.repositoriesCount || 0,
+          isVerified: user.isVerified ?? false,
         }))
 
         setUsers(formattedUsers)
@@ -284,6 +289,28 @@ export default function UsersPage() {
     }
   }
 
+  const handleVerify = async (id: string, isVerified: boolean) => {
+    try {
+      const userId = parseInt(id)
+      const response = await verifyUser(userId, isVerified)
+
+      if (response.status === "success") {
+        // Update the user in the list
+        const updated = users.map((u) =>
+          u.id === id ? { ...u, isVerified: isVerified } : u
+        )
+        setUsers(updated)
+        // Optionally reload to get fresh data
+        await loadUsers()
+      } else {
+        alert(response.message || "Failed to update verification status. Please try again.")
+      }
+    } catch (error) {
+      console.error("Error updating verification:", error)
+      alert("Failed to update verification status. Please try again.")
+    }
+  }
+
   const handleStatusChange = async (id: string, newStatus: "active" | "inactive" | "suspended") => {
     // Note: Status field doesn't exist in database yet
     // For now, we'll just update locally or you can add status field to database
@@ -337,14 +364,14 @@ export default function UsersPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <Users className="text-primary" size={28} />
+              <Users className="text-primary" size={24} />
               <div>
-                <h1 className="text-3xl font-bold text-foreground">Users</h1>
+                <h1 className="text-2xl font-bold text-foreground">Users</h1>
                 <p className="text-muted-foreground">
                   Manage user accounts and permissions
                 </p>
@@ -471,24 +498,25 @@ export default function UsersPage() {
                 </p>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Institution</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Repositories</TableHead>
-                    <TableHead>Joined</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
+              <div className="overflow-x-auto -mx-6 px-6">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[200px]">User</TableHead>
+                      <TableHead className="min-w-[100px]">Role</TableHead>
+                      <TableHead className="min-w-[150px]">Institution</TableHead>
+                      <TableHead className="min-w-[100px]">Status</TableHead>
+                      <TableHead className="min-w-[100px]">Repositories</TableHead>
+                      <TableHead className="min-w-[120px]">Joined</TableHead>
+                      <TableHead className="text-right min-w-[120px] sticky right-0 bg-card z-10 border-l border-border">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
                 <TableBody>
                   {filteredUsers.map((userItem) => (
                     <TableRow key={userItem.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center text-accent-foreground text-sm font-semibold">
+                          <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center text-accent-foreground text-sm font-semibold shrink-0">
                             {userItem.avatar ||
                               userItem.name
                                 .split(" ")
@@ -497,11 +525,16 @@ export default function UsersPage() {
                                 .toUpperCase()
                                 .slice(0, 2)}
                           </div>
-                          <div>
-                            <div className="font-medium">{userItem.name}</div>
-                            <div className="text-sm text-muted-foreground flex items-center gap-1">
-                              <Mail size={12} />
-                              {userItem.email}
+                          <div className="min-w-0">
+                            <div className="font-medium truncate flex items-center gap-2">
+                              {userItem.name}
+                              {userItem.isVerified && (
+                                <CheckCircle2 size={16} className="text-primary shrink-0" title="Verified" />
+                              )}
+                            </div>
+                            <div className="text-sm text-muted-foreground flex items-center gap-1 truncate">
+                              <Mail size={12} className="shrink-0" />
+                              <span className="truncate">{userItem.email}</span>
                             </div>
                           </div>
                         </div>
@@ -543,11 +576,11 @@ export default function UsersPage() {
                           {formatDate(userItem.createdAt)}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right sticky right-0 bg-card z-10 border-l border-border">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <Menu size={16} />
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <MoreVertical size={16} />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
@@ -557,6 +590,24 @@ export default function UsersPage() {
                               <FileText size={16} className="mr-2" />
                               Edit User
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            {userItem.isVerified ? (
+                              <DropdownMenuItem
+                                onClick={() => handleVerify(userItem.id, false)}
+                                className="text-orange-600 dark:text-orange-400"
+                              >
+                                <XCircle size={16} className="mr-2" />
+                                Remove Verification
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem
+                                onClick={() => handleVerify(userItem.id, true)}
+                                className="text-green-600 dark:text-green-400"
+                              >
+                                <CheckCircle2 size={16} className="mr-2" />
+                                Verify User
+                              </DropdownMenuItem>
+                            )}
                             {userItem.status === "active" && (
                               <>
                                 <DropdownMenuItem
@@ -599,7 +650,8 @@ export default function UsersPage() {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>

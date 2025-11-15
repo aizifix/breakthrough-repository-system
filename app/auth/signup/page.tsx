@@ -15,9 +15,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Mail, Lock, User, ArrowRight, ArrowLeft, Check, Building2, Shield } from "lucide-react"
+import { Mail, Lock, User, ArrowRight, ArrowLeft, Check, Building2, Shield, XIcon } from "lucide-react"
 import { register } from "@/app/config/api"
-import { Textarea } from "@/components/ui/textarea"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 const TOTAL_STEPS = 4
 
@@ -39,7 +46,6 @@ export default function SignupPage() {
     // Contact Info
     contactNumber: "",
     // Address Info
-    street: "",
     city: "",
     province: "",
     zipCode: "",
@@ -52,6 +58,27 @@ export default function SignupPage() {
   const [captchaAnswer, setCaptchaAnswer] = useState("")
   const [captchaQuestion, setCaptchaQuestion] = useState({ num1: 0, num2: 0 })
   const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [consentModalOpen, setConsentModalOpen] = useState(false)
+  const [privacyModalOpen, setPrivacyModalOpen] = useState(false)
+
+  // Check if user is already logged in
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("user")
+      if (stored) {
+        const userData = JSON.parse(stored)
+        const userRole = userData.role || "publisher"
+        // Redirect to appropriate dashboard and prevent back navigation
+        if (userRole === "admin") {
+          window.history.replaceState(null, "", "/admin/dashboard")
+          router.replace("/admin/dashboard")
+        } else {
+          window.history.replaceState(null, "", "/publisher")
+          router.replace("/publisher")
+        }
+      }
+    }
+  }, [router])
 
   // Generate captcha question on mount and when needed
   React.useEffect(() => {
@@ -141,7 +168,7 @@ export default function SignupPage() {
         return true
 
       case 3: // Address Info
-        if (!formData.street || !formData.city || !formData.province || !formData.zipCode || !formData.country) {
+        if (!formData.city || !formData.province || !formData.zipCode || !formData.country) {
           setError("Please fill in all required address fields")
           return false
         }
@@ -196,7 +223,7 @@ export default function SignupPage() {
         : `${formData.firstName} ${formData.lastName}`
 
       // Combine address
-      const fullAddress = `${formData.street}, ${formData.city}, ${formData.province} ${formData.zipCode}, ${formData.country}`
+      const fullAddress = `${formData.city}, ${formData.province} ${formData.zipCode}, ${formData.country}`
 
       // Call backend API for registration
       const result = await register({
@@ -218,10 +245,26 @@ export default function SignupPage() {
           email: formData.email,
           avatar: formData.firstName.charAt(0).toUpperCase(),
           role: "publisher",
+          userId: result.user_id,
+          uniqueId: result.user_unique_id,
+        }
+
+        // Store extended profile data
+        const extendedProfile = {
+          institution: formData.institution,
+          department: formData.department,
+          position: formData.position,
+          contactNumber: formData.contactNumber,
+          address: fullAddress,
         }
 
         localStorage.setItem("user", JSON.stringify(user))
-        router.push("/publisher")
+        localStorage.setItem(`userProfile_${formData.email}`, JSON.stringify(extendedProfile))
+
+        // Show success message with unique ID
+        alert(`Registration successful!\n\nYour unique identifier is:\n${result.user_unique_id}\n\nPlease save this ID for future reference.`)
+
+        router.push("/auth/login")
       } else {
         setError(result.message || "Registration failed. Please try again.")
       }
@@ -602,20 +645,6 @@ export default function SignupPage() {
             {/* Step 3: Address Info */}
             {currentStep === 3 && (
               <div className="flex-1 flex flex-col space-y-4 sm:space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="street" className="text-foreground font-medium">
-                    Street Address <span className="text-destructive">*</span>
-                  </Label>
-                  <Textarea
-                    id="street"
-                    placeholder="House/Building Number, Street Name, Barangay"
-                    value={formData.street}
-                    onChange={(e) => setFormData({ ...formData, street: e.target.value })}
-                    className="bg-input border-border min-h-20"
-                    disabled={isLoading}
-                  />
-                </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="city" className="text-foreground font-medium">
@@ -735,7 +764,7 @@ export default function SignupPage() {
                     <div>
                       <span className="text-muted-foreground">Address:</span>{" "}
                       <span className="text-foreground font-medium">
-                        {formData.street}, {formData.city}, {formData.province} {formData.zipCode}, {formData.country}
+                        {formData.city}, {formData.province} {formData.zipCode}, {formData.country}
                       </span>
                     </div>
                   </div>
@@ -785,13 +814,27 @@ export default function SignupPage() {
                     className="text-sm text-foreground cursor-pointer leading-relaxed"
                   >
                     I agree to the{" "}
-                    <Link href="#" className="text-accent hover:underline">
-                      Terms of Service
-                    </Link>{" "}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        setConsentModalOpen(true)
+                      }}
+                      className="text-accent hover:underline"
+                    >
+                      Consent to Data Processing
+                    </button>{" "}
                     and{" "}
-                    <Link href="#" className="text-accent hover:underline">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        setPrivacyModalOpen(true)
+                      }}
+                      className="text-accent hover:underline"
+                    >
                       Privacy Policy
-                    </Link>
+                    </button>
                     <span className="text-destructive"> *</span>
                   </Label>
                 </div>
@@ -853,6 +896,145 @@ export default function SignupPage() {
           </div>
         </div>
       </main>
+
+      {/* Consent Modal */}
+      <Dialog open={consentModalOpen} onOpenChange={setConsentModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] p-0 flex flex-col" showCloseButton={false}>
+          <div className="sticky top-0 z-10 bg-background border-b px-6 pt-6 pb-4">
+            <div className="flex items-start justify-between gap-4">
+              <DialogHeader className="flex-1">
+                <DialogTitle>Consent to Data Processing</DialogTitle>
+                <DialogDescription>
+                  Please read and understand our data processing consent agreement.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogClose className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none flex-shrink-0 mt-1">
+                <XIcon className="size-4" />
+                <span className="sr-only">Close</span>
+              </DialogClose>
+            </div>
+          </div>
+          <div className="overflow-y-auto flex-1 px-6 pb-6">
+            <div className="space-y-4 text-sm text-foreground pt-4">
+            <p>
+              By creating an account, you consent to the processing of your personal data as described in this consent agreement.
+            </p>
+            <div>
+              <h4 className="font-semibold mb-2">1. Data Collection</h4>
+              <p>
+                We collect personal information including your name, email address, institution details, and contact information to provide you with access to our research repository system.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-2">2. Purpose of Processing</h4>
+              <p>
+                Your data will be processed for the following purposes:
+              </p>
+              <ul className="list-disc list-inside mt-2 space-y-1 ml-4">
+                <li>Account creation and management</li>
+                <li>Access to research publications and repository features</li>
+                <li>Communication regarding your account and platform updates</li>
+                <li>Compliance with legal and regulatory requirements</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-2">3. Data Storage and Security</h4>
+              <p>
+                We implement appropriate technical and organizational measures to protect your personal data against unauthorized access, alteration, disclosure, or destruction.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-2">4. Your Rights</h4>
+              <p>
+                You have the right to access, rectify, or delete your personal data at any time. You may also withdraw your consent, though this may affect your ability to use our services.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-2">5. Contact Information</h4>
+              <p>
+                If you have any questions about this consent agreement or wish to exercise your rights, please contact us through the provided channels.
+              </p>
+            </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Privacy Policy Modal */}
+      <Dialog open={privacyModalOpen} onOpenChange={setPrivacyModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] p-0 flex flex-col" showCloseButton={false}>
+          <div className="sticky top-0 z-10 bg-background border-b px-6 pt-6 pb-4">
+            <div className="flex items-start justify-between gap-4">
+              <DialogHeader className="flex-1">
+                <DialogTitle>Privacy Policy</DialogTitle>
+                <DialogDescription>
+                  Our commitment to protecting your privacy and personal information.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogClose className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none flex-shrink-0 mt-1">
+                <XIcon className="size-4" />
+                <span className="sr-only">Close</span>
+              </DialogClose>
+            </div>
+          </div>
+          <div className="overflow-y-auto flex-1 px-6 pb-6">
+            <div className="space-y-4 text-sm text-foreground pt-4">
+            <p>
+              This Privacy Policy describes how we collect, use, and protect your personal information when you use our research repository system.
+            </p>
+            <div>
+              <h4 className="font-semibold mb-2">Information We Collect</h4>
+              <p>
+                We collect information that you provide directly to us, including:
+              </p>
+              <ul className="list-disc list-inside mt-2 space-y-1 ml-4">
+                <li>Personal identification information (name, email address)</li>
+                <li>Institutional affiliation and position</li>
+                <li>Contact information</li>
+                <li>Account credentials and usage data</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-2">How We Use Your Information</h4>
+              <p>
+                We use the information we collect to:
+              </p>
+              <ul className="list-disc list-inside mt-2 space-y-1 ml-4">
+                <li>Provide, maintain, and improve our services</li>
+                <li>Process your account registration and manage your account</li>
+                <li>Send you technical notices and support messages</li>
+                <li>Respond to your comments and questions</li>
+                <li>Monitor and analyze trends and usage</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-2">Information Sharing</h4>
+              <p>
+                We do not sell, trade, or rent your personal information to third parties. We may share your information only in limited circumstances, such as when required by law or to protect our rights.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-2">Data Security</h4>
+              <p>
+                We implement industry-standard security measures to protect your personal information. However, no method of transmission over the Internet is 100% secure.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-2">Changes to This Policy</h4>
+              <p>
+                We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-2">Contact Us</h4>
+              <p>
+                If you have any questions about this Privacy Policy, please contact us through the provided support channels.
+              </p>
+            </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

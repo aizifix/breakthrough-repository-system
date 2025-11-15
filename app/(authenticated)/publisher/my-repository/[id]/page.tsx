@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -12,7 +12,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { ArrowLeft, FileText, CheckCircle2, XCircle, AlertCircle, Download, Trash2, X } from "lucide-react"
+import { ArrowLeft, FileText, Download, Trash2, X, CheckCircle2 } from "lucide-react"
 import RepositorySocialFeatures from "@/components/repository-social-features"
 import {
   AlertDialog,
@@ -37,14 +37,14 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 
-interface PlagiarismData {
-  overallScore: number
-  status: "passed" | "warning" | "failed"
-  checks: Array<{ name: string; score: number; status: "passed" | "failed" }>
-  lastChecked: string
-  provider?: string
-  note?: string
-}
+// interface PlagiarismData {
+//   overallScore: number
+//   status: "passed" | "warning" | "failed"
+//   checks: Array<{ name: string; score: number; status: "passed" | "failed" }>
+//   lastChecked: string
+//   provider?: string
+//   note?: string
+// }
 
 interface Repository {
   id: number | string
@@ -53,9 +53,10 @@ interface Repository {
   publisher: number | {
     name: string
     avatar: string
+    isVerified?: boolean
   }
   category: string[]
-  tags: string[]
+  keywords: string[]
   publishedDate: string | null
   publishedStatus: "pending" | "published" | "rejected" | "unpublished" | "draft"
   pdfUrl?: string
@@ -73,20 +74,21 @@ export default function ResearchDetailPage() {
   const [research, setResearch] = useState<Repository | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [plagiarismData, setPlagiarismData] = useState<PlagiarismData | null>(null)
-  const [isCheckingPlagiarism, setIsCheckingPlagiarism] = useState(false)
-  const [plagiarismError, setPlagiarismError] = useState<string | null>(null)
+  // const [plagiarismData, setPlagiarismData] = useState<PlagiarismData | null>(null)
+  // const [isCheckingPlagiarism, setIsCheckingPlagiarism] = useState(false)
+  // const [plagiarismError, setPlagiarismError] = useState<string | null>(null)
 
   // Edit states
-  const [editingField, setEditingField] = useState<"title" | "abstract" | "categories" | "tags" | "pdf" | null>(null)
+  const [editingField, setEditingField] = useState<"title" | "abstract" | "categories" | "keywords" | "pdf" | null>(null)
   const [editTitle, setEditTitle] = useState("")
   const [editAbstract, setEditAbstract] = useState("")
   const [editCategories, setEditCategories] = useState<string[]>([])
-  const [editTags, setEditTags] = useState<string[]>([])
-  const [editTagInput, setEditTagInput] = useState("")
+  const [editKeywords, setEditKeywords] = useState<string[]>([])
+  const [editKeywordInput, setEditKeywordInput] = useState("")
   const [editCategoryInput, setEditCategoryInput] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [selectedPdfFile, setSelectedPdfFile] = useState<File | null>(null)
+  const viewIncrementedRef = useRef(false)
 
   // Load user and repository from API
   useEffect(() => {
@@ -115,6 +117,34 @@ export default function ResearchDetailPage() {
         }
 
         try {
+          // Increment view count only once per page load
+          // Use sessionStorage to prevent duplicate increments even on remounts
+          const viewKey = `view_incremented_${researchId}`
+          const hasIncremented = sessionStorage.getItem(viewKey)
+
+          if (!hasIncremented && !viewIncrementedRef.current) {
+            viewIncrementedRef.current = true
+            try {
+              await fetch("http://localhost/repository-api/publisher.php", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  operation: "increment_view",
+                  repository_id: researchId,
+                }),
+              })
+              // Mark as incremented in sessionStorage
+              sessionStorage.setItem(viewKey, "true")
+            } catch (viewError) {
+              console.error("Error incrementing view count:", viewError)
+              // Reset ref on error so it can retry
+              viewIncrementedRef.current = false
+            }
+          }
+
+          // Then fetch repository data
           const response = await fetch("http://localhost/repository-api/publisher.php", {
             method: "POST",
             headers: {
@@ -145,11 +175,12 @@ export default function ResearchDetailPage() {
                   .join("")
                   .toUpperCase()
                   .slice(0, 2),
+                isVerified: repo.publisher_is_verified ?? false,
               },
               category: Array.isArray(repo.category)
                 ? repo.category.filter((c: string) => c && c.trim())
                 : (repo.category ? [repo.category].filter((c: string) => c && c.trim()) : []),
-              tags: Array.isArray(repo.tags)
+              keywords: Array.isArray(repo.tags)
                 ? repo.tags.filter((t: string) => t && t.trim())
                 : (repo.tags ? [repo.tags].filter((t: string) => t && t.trim()) : []),
               // Store original publisher ID for ownership check
@@ -171,55 +202,55 @@ export default function ResearchDetailPage() {
   }, [params?.id, router])
 
   // Trigger plagiarism check (runs automatically on load and can be triggered manually)
-  const handleCheckPlagiarism = async (forceRecheck = false) => {
-    if (!research || !research.id) return
+  // const handleCheckPlagiarism = async (forceRecheck = false) => {
+  //   if (!research || !research.id) return
 
-    setIsCheckingPlagiarism(true)
-    setPlagiarismError(null)
+  //   setIsCheckingPlagiarism(true)
+  //   setPlagiarismError(null)
 
-    try {
-      const response = await fetch("http://localhost/repository-api/publisher.php", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          operation: "check_plagiarism",
-          repository_id: research.id,
-          force_recheck: forceRecheck,
-        }),
-      })
+  //   try {
+  //     const response = await fetch("http://localhost/repository-api/publisher.php", {
+  //       method: "POST",
+  //       headers: {
+  //         "Content-Type": "application/json",
+  //       },
+  //       body: JSON.stringify({
+  //         operation: "check_plagiarism",
+  //         repository_id: research.id,
+  //         force_recheck: forceRecheck,
+  //       }),
+  //     })
 
-      const result = await response.json()
+  //     const result = await response.json()
 
-      if (result.status === "success" && result.data) {
-        setPlagiarismData(result.data)
-        setPlagiarismError(null)
-        // If results were cached, loading state was very brief, so we can hide it immediately
-        if (result.cached) {
-          setIsCheckingPlagiarism(false)
-        }
-      } else {
-        setPlagiarismError(result.message || "Failed to check plagiarism")
-        setIsCheckingPlagiarism(false)
-      }
-    } catch (error) {
-      console.error("Error checking plagiarism:", error)
-      setPlagiarismError("Failed to check plagiarism. Please try again.")
-      setIsCheckingPlagiarism(false)
-    } finally {
-      // Only set loading to false if not already set (for cached results)
-      setTimeout(() => setIsCheckingPlagiarism(false), 100)
-    }
-  }
+  //     if (result.status === "success" && result.data) {
+  //       setPlagiarismData(result.data)
+  //       setPlagiarismError(null)
+  //       // If results were cached, loading state was very brief, so we can hide it immediately
+  //       if (result.cached) {
+  //         setIsCheckingPlagiarism(false)
+  //       }
+  //     } else {
+  //       setPlagiarismError(result.message || "Failed to check plagiarism")
+  //       setIsCheckingPlagiarism(false)
+  //     }
+  //   } catch (error) {
+  //     console.error("Error checking plagiarism:", error)
+  //     setPlagiarismError("Failed to check plagiarism. Please try again.")
+  //     setIsCheckingPlagiarism(false)
+  //   } finally {
+  //     // Only set loading to false if not already set (for cached results)
+  //     setTimeout(() => setIsCheckingPlagiarism(false), 100)
+  //   }
+  // }
 
   // Automatically check plagiarism when research is loaded
-  useEffect(() => {
-    if (research && research.id) {
-      handleCheckPlagiarism()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [research?.id])
+  // useEffect(() => {
+  //   if (research && research.id) {
+  //     handleCheckPlagiarism()
+  //   }
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [research?.id])
 
   if (isLoading) {
     return (
@@ -319,7 +350,7 @@ export default function ResearchDetailPage() {
   const canEdit = isOwner && research && ["pending", "unpublished"].includes(research.publishedStatus)
 
   // Open edit dialog for a field
-  const openEditDialog = (field: "title" | "abstract" | "categories" | "tags" | "pdf") => {
+  const openEditDialog = (field: "title" | "abstract" | "categories" | "keywords" | "pdf") => {
     if (!research || !canEdit) return
 
     setEditingField(field)
@@ -330,9 +361,9 @@ export default function ResearchDetailPage() {
     } else if (field === "categories") {
       setEditCategories([...research.category])
       setEditCategoryInput("")
-    } else if (field === "tags") {
-      setEditTags([...research.tags])
-      setEditTagInput("")
+    } else if (field === "keywords") {
+      setEditKeywords([...research.keywords])
+      setEditKeywordInput("")
     } else if (field === "pdf") {
       setSelectedPdfFile(null)
     }
@@ -351,17 +382,17 @@ export default function ResearchDetailPage() {
     setEditCategories(editCategories.filter((c) => c !== cat))
   }
 
-  // Add tag
-  const addTag = () => {
-    if (editTagInput.trim() && !editTags.includes(editTagInput.trim())) {
-      setEditTags([...editTags, editTagInput.trim()])
-      setEditTagInput("")
+  // Add keyword
+  const addKeyword = () => {
+    if (editKeywordInput.trim() && !editKeywords.includes(editKeywordInput.trim())) {
+      setEditKeywords([...editKeywords, editKeywordInput.trim()])
+      setEditKeywordInput("")
     }
   }
 
-  // Remove tag
-  const removeTag = (tag: string) => {
-    setEditTags(editTags.filter((t) => t !== tag))
+  // Remove keyword
+  const removeKeyword = (keyword: string) => {
+    setEditKeywords(editKeywords.filter((k) => k !== keyword))
   }
 
   // Save changes
@@ -386,27 +417,27 @@ export default function ResearchDetailPage() {
         formData.append("title", editTitle)
         formData.append("abstract", research.abstract)
         formData.append("category", research.category.join(", "))
-        formData.append("tags", research.tags.join(", "))
+        formData.append("tags", research.keywords.join(", "))
       } else if (editingField === "abstract") {
         formData.append("title", research.title)
         formData.append("abstract", editAbstract)
         formData.append("category", research.category.join(", "))
-        formData.append("tags", research.tags.join(", "))
+        formData.append("tags", research.keywords.join(", "))
       } else if (editingField === "categories") {
         formData.append("title", research.title)
         formData.append("abstract", research.abstract)
         formData.append("category", editCategories.join(", "))
-        formData.append("tags", research.tags.join(", "))
-      } else if (editingField === "tags") {
+        formData.append("tags", research.keywords.join(", "))
+      } else if (editingField === "keywords") {
         formData.append("title", research.title)
         formData.append("abstract", research.abstract)
         formData.append("category", research.category.join(", "))
-        formData.append("tags", editTags.join(", "))
+        formData.append("tags", editKeywords.join(", "))
       } else if (editingField === "pdf") {
         formData.append("title", research.title)
         formData.append("abstract", research.abstract)
         formData.append("category", research.category.join(", "))
-        formData.append("tags", research.tags.join(", "))
+        formData.append("tags", research.keywords.join(", "))
         if (selectedPdfFile) {
           formData.append("pdfFile", selectedPdfFile)
         }
@@ -453,7 +484,7 @@ export default function ResearchDetailPage() {
             category: Array.isArray(repo.category)
               ? repo.category.filter((c: string) => c && c.trim())
               : (repo.category ? [repo.category].filter((c: string) => c && c.trim()) : []),
-            tags: Array.isArray(repo.tags)
+            keywords: Array.isArray(repo.tags)
               ? repo.tags.filter((t: string) => t && t.trim())
               : (repo.tags ? [repo.tags].filter((t: string) => t && t.trim()) : []),
             publisherId: originalPublisherId,
@@ -534,9 +565,9 @@ export default function ResearchDetailPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 gap-8">
           {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="space-y-6">
             {/* Publisher Info */}
             <div className="flex items-center gap-4 pb-6 border-b border-border">
               <div className="w-16 h-16 rounded-full bg-accent flex items-center justify-center shrink-0">
@@ -545,9 +576,14 @@ export default function ResearchDetailPage() {
                 </span>
               </div>
               <div className="flex-1">
-                <p className="font-semibold text-foreground text-lg">
-                  {typeof research.publisher === 'object' ? research.publisher.name : 'Unknown Publisher'}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-foreground text-lg">
+                    {typeof research.publisher === 'object' ? research.publisher.name : 'Unknown Publisher'}
+                  </p>
+                  {typeof research.publisher === 'object' && research.publisher.isVerified && (
+                    <CheckCircle2 size={18} className="text-primary shrink-0" />
+                  )}
+                </div>
                 <p className="text-sm text-muted-foreground">{research.publishedDate || "Not published"}</p>
               </div>
               <span
@@ -575,7 +611,7 @@ export default function ResearchDetailPage() {
 
             {/* Title */}
             <div className="group relative">
-              <h1 className="text-3xl md:text-4xl font-bold text-foreground pr-10">{research.title}</h1>
+              <h1 className="text-2xl font-bold text-foreground pr-10">{research.title}</h1>
               {canEdit && (
                 <button
                   onClick={() => openEditDialog("title")}
@@ -615,24 +651,24 @@ export default function ResearchDetailPage() {
               </div>
               <div className="group relative">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-muted-foreground">Tags</h3>
+                  <h3 className="text-sm font-semibold text-muted-foreground">Keywords</h3>
                   {canEdit && (
                     <button
-                      onClick={() => openEditDialog("tags")}
+                      onClick={() => openEditDialog("keywords")}
                       className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded-md"
-                      title="Edit tags"
+                      title="Edit keywords"
                     >
                       <FileText size={16} className="text-muted-foreground hover:text-foreground" />
                     </button>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {research.tags.map((tag) => (
+                  {research.keywords.map((keyword) => (
                     <span
-                      key={tag}
+                      key={keyword}
                       className="inline-block px-3 py-1.5 bg-muted text-muted-foreground text-sm rounded"
                     >
-                      #{tag}
+                      #{keyword}
                     </span>
                   ))}
                 </div>
@@ -835,41 +871,41 @@ export default function ResearchDetailPage() {
             </DialogContent>
           </Dialog>
 
-          <Dialog open={editingField === "tags"} onOpenChange={(open) => !open && setEditingField(null)}>
+          <Dialog open={editingField === "keywords"} onOpenChange={(open) => !open && setEditingField(null)}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Edit Tags</DialogTitle>
-                <DialogDescription>Add or remove tags for your repository.</DialogDescription>
+                <DialogTitle>Edit Keywords</DialogTitle>
+                <DialogDescription>Add or remove keywords for your repository.</DialogDescription>
               </DialogHeader>
               <div className="py-4 space-y-4">
                 <div className="flex gap-2">
                   <Input
-                    value={editTagInput}
-                    onChange={(e) => setEditTagInput(e.target.value)}
+                    value={editKeywordInput}
+                    onChange={(e) => setEditKeywordInput(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault()
-                        addTag()
+                        addKeyword()
                       }
                     }}
-                    placeholder="Enter tag name"
+                    placeholder="Enter keyword name"
                   />
-                  <Button onClick={addTag} type="button" variant="outline">
+                  <Button onClick={addKeyword} type="button" variant="outline">
                     Add
                   </Button>
                 </div>
                 <div className="flex flex-wrap gap-2 min-h-[60px] p-3 border rounded-md">
-                  {editTags.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No tags added yet</p>
+                  {editKeywords.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No keywords added yet</p>
                   ) : (
-                    editTags.map((tag) => (
+                    editKeywords.map((keyword) => (
                       <span
-                        key={tag}
+                        key={keyword}
                         className="inline-flex items-center gap-1 px-3 py-1.5 bg-muted text-muted-foreground text-sm rounded"
                       >
-                        #{tag}
+                        #{keyword}
                         <button
-                          onClick={() => removeTag(tag)}
+                          onClick={() => removeKeyword(keyword)}
                           className="ml-1 hover:text-destructive"
                           type="button"
                         >
@@ -931,122 +967,17 @@ export default function ResearchDetailPage() {
             </DialogContent>
           </Dialog>
 
-          {/* Sidebar - Plagiarism Check */}
+          {/* Sidebar - Plagiarism Check - COMMENTED OUT */}
+          {/*
           <div className="lg:col-span-1">
             <div className="sticky top-24 bg-card border border-border rounded-lg p-6">
               <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
                 <FileText size={20} />
                 Plagiarism Check
               </h3>
-
-              {plagiarismError && (
-                <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-                  <p className="text-sm text-destructive">{plagiarismError}</p>
-                </div>
-              )}
-
-              {isCheckingPlagiarism && !plagiarismData && (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                  <p className="text-sm text-muted-foreground">Checking for plagiarism...</p>
-                </div>
-              )}
-
-              {!isCheckingPlagiarism && plagiarismData && (
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                  {/* Overall Score */}
-                  <div className="mb-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-muted-foreground">Overall Score</span>
-                      <span className="text-2xl font-bold text-foreground">{plagiarismData.overallScore}%</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
-                      <div
-                        className={`h-2.5 rounded-full transition-all duration-1000 ease-out ${
-                          plagiarismData.status === "passed"
-                            ? "bg-green-500"
-                            : plagiarismData.status === "warning"
-                              ? "bg-yellow-500"
-                              : "bg-red-500"
-                        }`}
-                        style={{
-                          width: `${plagiarismData.overallScore}%`,
-                          transition: "width 1s ease-out"
-                        }}
-                      />
-                    </div>
-                    <div className="flex items-center gap-2 mt-2">
-                      {plagiarismData.status === "passed" ? (
-                        <>
-                          <CheckCircle2 size={16} className="text-green-500" />
-                          <span className="text-sm text-green-600 dark:text-green-400">Passed</span>
-                        </>
-                      ) : plagiarismData.status === "warning" ? (
-                        <>
-                          <AlertCircle size={16} className="text-yellow-500" />
-                          <span className="text-sm text-yellow-600 dark:text-yellow-400">Warning</span>
-                        </>
-                      ) : (
-                        <>
-                          <XCircle size={16} className="text-red-500" />
-                          <span className="text-sm text-red-600 dark:text-red-400">Failed</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Individual Checks */}
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-semibold text-foreground">Detailed Checks</h4>
-                    {plagiarismData.checks.map((check, index) => (
-                      <div key={index} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">{check.name}</span>
-                          <span className="text-sm font-medium text-foreground">{check.score}%</span>
-                        </div>
-                        <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
-                          <div
-                            className={`h-1.5 rounded-full transition-all duration-1000 ease-out ${
-                              check.status === "passed" ? "bg-green-500" : "bg-red-500"
-                            }`}
-                            style={{
-                              width: `${check.score}%`,
-                              transition: "width 1s ease-out",
-                              transitionDelay: `${index * 0.1}s`
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Provider Note */}
-                  {plagiarismData.note && (
-                    <div className="mt-4 p-3 bg-muted/50 border border-border rounded-md">
-                      <p className="text-xs text-muted-foreground">{plagiarismData.note}</p>
-                    </div>
-                  )}
-
-                  {/* Last Checked */}
-                  <div className="mt-6 pt-6 border-t border-border">
-                    <p className="text-xs text-muted-foreground">
-                      Last checked: {new Date(plagiarismData.lastChecked).toLocaleDateString()}
-                      {plagiarismData.provider && (
-                        <span className="ml-2">• {plagiarismData.provider}</span>
-                      )}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {!isCheckingPlagiarism && !plagiarismData && !plagiarismError && (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                  <p className="text-sm text-muted-foreground">Checking for plagiarism...</p>
-                </div>
-              )}
             </div>
           </div>
+          */}
         </div>
       </div>
   )

@@ -5,11 +5,10 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import Navbar from "@/components/navbar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Mail, Lock, ArrowRight, RefreshCw } from "lucide-react"
+import { Mail, Lock, ArrowRight, RefreshCw, Quote, ArrowLeft } from "lucide-react"
 import { login } from "@/app/config/api"
 
 export default function LoginPage() {
@@ -22,6 +21,25 @@ export default function LoginPage() {
   const [captchaQuestion, setCaptchaQuestion] = useState({ num1: 0, num2: 0 })
   const [captchaCorrect, setCaptchaCorrect] = useState(false)
   const [captchaTouched, setCaptchaTouched] = useState(false)
+
+  // Check if user is already logged in
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("user")
+      if (stored) {
+        const userData = JSON.parse(stored)
+        const userRole = userData.role || "publisher"
+        // Redirect to appropriate dashboard and prevent back navigation
+        if (userRole === "admin") {
+          window.history.replaceState(null, "", "/admin/dashboard")
+          router.replace("/admin/dashboard")
+        } else {
+          window.history.replaceState(null, "", "/publisher")
+          router.replace("/publisher")
+        }
+      }
+    }
+  }, [router])
 
   // Generate captcha question on mount
   useEffect(() => {
@@ -82,9 +100,20 @@ export default function LoginPage() {
           avatar: (userData.user_name || email.split("@")[0]).charAt(0).toUpperCase(),
           role: userData.user_role || "publisher",
           userId: userData.user_id,
+          uniqueId: userData.user_unique_id,
+        }
+
+        // Store extended profile data from database
+        const extendedProfile = {
+          institution: userData.user_school || "",
+          department: userData.user_department || "",
+          position: userData.user_type || "",
+          contactNumber: userData.user_contact || "",
+          address: userData.user_address || "",
         }
 
         localStorage.setItem("user", JSON.stringify(user))
+        localStorage.setItem(`userProfile_${userData.user_email}`, JSON.stringify(extendedProfile))
 
         // Redirect based on role (default to publisher)
         const userRole = userData.user_role || "publisher"
@@ -104,14 +133,90 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <Navbar />
+    <div className="min-h-screen flex">
+      {/* Left Section - Dark Teal/Cyan Background with Logo, Details, and Quote */}
+      <div className="hidden lg:flex lg:w-1/2 bg-[#1a3a3f] p-12 flex-col justify-between relative overflow-hidden">
+        {/* Decorative background elements */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full -translate-x-1/2 -translate-y-1/2"></div>
+          <div className="absolute bottom-0 right-0 w-96 h-96 bg-white rounded-full translate-x-1/2 translate-y-1/2"></div>
+        </div>
 
-      <main className="flex-1 flex items-center justify-center px-4 py-12">
+        <div className="relative z-10">
+          {/* Back Button */}
+          <div className="mb-8">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push("/")}
+              className="text-white/80 hover:text-white hover:bg-white/10"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to home
+            </Button>
+          </div>
+
+          {/* Logo Section */}
+          <div className="mb-12">
+            <Link href="/" className="flex items-center gap-3 mb-8">
+              <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center shadow-lg">
+                <span className="text-[#1a3a3f] text-xl font-bold">BT</span>
+              </div>
+              <span className="text-white text-2xl font-bold">Breakthrough</span>
+            </Link>
+          </div>
+
+          {/* Details Section */}
+          <div className="mb-12 space-y-6">
+            <h2 className="text-white text-4xl font-bold leading-tight">
+              Welcome to Breakthrough
+            </h2>
+            <p className="text-teal-50 text-lg leading-relaxed">
+              Your gateway to academic research repositories. Discover, manage, and share knowledge with ease.
+            </p>
+            <div className="space-y-4 pt-4">
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <div className="w-2 h-2 rounded-full bg-white"></div>
+                </div>
+                <p className="text-teal-50">Access thousands of research repositories</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <div className="w-2 h-2 rounded-full bg-white"></div>
+                </div>
+                <p className="text-teal-50">Manage your publications and research</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <div className="w-2 h-2 rounded-full bg-white"></div>
+                </div>
+                <p className="text-teal-50">Connect with researchers worldwide</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quote Section */}
+        <div className="relative z-10 mt-auto">
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
+            <Quote className="w-8 h-8 text-white/80 mb-4" />
+            <p className="text-white text-lg italic leading-relaxed mb-4">
+              "Knowledge shared is knowledge multiplied. Breakthrough makes it possible for researchers to connect, collaborate, and create impact."
+            </p>
+            <p className="text-teal-100 text-sm font-medium">
+              — Research Community
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Section - Login Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center bg-background px-4 py-12">
         <div className="w-full max-w-md">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="flex justify-center mb-4">
+            <div className="flex justify-center mb-4 lg:hidden">
               <div className="w-12 h-12 bg-accent rounded-lg flex items-center justify-center">
                 <span className="text-accent-foreground text-lg font-bold">BT</span>
               </div>
@@ -268,7 +373,7 @@ export default function LoginPage() {
             </Link>
           </p>
         </div>
-      </main>
+      </div>
     </div>
   )
 }

@@ -11,6 +11,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
@@ -26,18 +27,13 @@ import { FileText, Plus, X, CheckCircle2, ArrowLeft, Upload } from "lucide-react
 import { useToast } from "@/hooks/use-toast"
 import { Progress } from "@/components/ui/progress"
 
-const RESEARCH_TYPES = [
-  "Case Study",
-  "Peer-Reviewed",
-  "Survey",
-  "Technical Report",
-  "Whitepaper",
-  "Capstone",
-  "Thesis",
-  "Custom",
-]
+interface DepartmentOption {
+  id: number
+  name: string
+  description?: string
+}
 
-interface CategoryOption {
+interface ResearchTypeOption {
   id: number
   name: string
   description?: string
@@ -50,39 +46,117 @@ export default function PublishPage() {
   const [formData, setFormData] = useState({
     title: "",
     abstract: "",
-    category: "",
-    customCategory: "",
+    department: "",
+    customDepartment: "",
     researchType: "",
     customResearchType: "",
-    tags: [] as string[],
-    tagInput: "",
+    keywords: [] as string[],
+    keywordInput: "",
   })
-  const [categories, setCategories] = useState<CategoryOption[]>([])
-  const [isLoadingCategories, setIsLoadingCategories] = useState(true)
+  const [departments, setDepartments] = useState<DepartmentOption[]>([])
+  const [researchTypes, setResearchTypes] = useState<ResearchTypeOption[]>([])
+  const [isLoadingDepartments, setIsLoadingDepartments] = useState(true)
+  const [isLoadingResearchTypes, setIsLoadingResearchTypes] = useState(true)
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
+  const [isVerified, setIsVerified] = useState<boolean | null>(null)
+  const [isCheckingVerification, setIsCheckingVerification] = useState(true)
 
-  // Load categories from API
+  // Check user verification status
   useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        setIsLoadingCategories(true)
-        const response = await fetch("http://localhost/repository-api/filters.php?operation=get_categories")
-        const result = await response.json()
-        if (result.status === "success" && result.data) {
-          setCategories(result.data)
+    const checkVerification = async () => {
+      if (typeof window !== "undefined" && user) {
+        try {
+          let verificationStatus = (user as any)?.is_verified ?? (user as any)?.isVerified ?? false
+
+          // Always fetch from API to get the latest verification status
+          if (user.email) {
+            try {
+              const response = await fetch("http://localhost/repository-api/auth.php", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  operation: "get_user_by_email",
+                  email: user.email,
+                }),
+              })
+
+              const result = await response.json()
+              if (result.status === "success" && result.user) {
+                verificationStatus = result.user.is_verified ?? false
+                // Update localStorage
+                const updatedUser = {
+                  ...user,
+                  is_verified: verificationStatus,
+                  isVerified: verificationStatus,
+                }
+                localStorage.setItem("user", JSON.stringify(updatedUser))
+                setUser(updatedUser)
+              }
+            } catch (error) {
+              console.error("Error checking verification status:", error)
+            }
+          }
+
+          setIsVerified(verificationStatus)
+        } catch (error) {
+          console.error("Error checking verification:", error)
+          setIsVerified(false)
+        } finally {
+          setIsCheckingVerification(false)
         }
-      } catch (error) {
-        console.error("Failed to load categories:", error)
-      } finally {
-        setIsLoadingCategories(false)
+      } else if (!user) {
+        setIsCheckingVerification(false)
       }
     }
-    loadCategories()
+
+    if (user) {
+      checkVerification()
+    }
+  }, [user])
+
+  // Load departments from API
+  useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        setIsLoadingDepartments(true)
+        const response = await fetch("http://localhost/repository-api/filters.php?operation=get_departments")
+        const result = await response.json()
+        if (result.status === "success" && result.data) {
+          setDepartments(result.data)
+        }
+      } catch (error) {
+        console.error("Failed to load departments:", error)
+      } finally {
+        setIsLoadingDepartments(false)
+      }
+    }
+    loadDepartments()
+  }, [])
+
+  // Load research types from API
+  useEffect(() => {
+    const loadResearchTypes = async () => {
+      try {
+        setIsLoadingResearchTypes(true)
+        const response = await fetch("http://localhost/repository-api/filters.php?operation=get_research_types")
+        const result = await response.json()
+        if (result.status === "success" && result.data) {
+          setResearchTypes(result.data)
+        }
+      } catch (error) {
+        console.error("Failed to load research types:", error)
+      } finally {
+        setIsLoadingResearchTypes(false)
+      }
+    }
+    loadResearchTypes()
   }, [])
 
   useEffect(() => {
@@ -135,20 +209,20 @@ export default function PublishPage() {
   }, [router])
 
 
-  const handleTagAdd = () => {
-    if (formData.tagInput.trim() && !formData.tags.includes(formData.tagInput.trim())) {
+  const handleKeywordAdd = () => {
+    if (formData.keywordInput.trim() && !formData.keywords.includes(formData.keywordInput.trim())) {
       setFormData((prev) => ({
         ...prev,
-        tags: [...prev.tags, prev.tagInput.trim()],
-        tagInput: "",
+        keywords: [...prev.keywords, prev.keywordInput.trim()],
+        keywordInput: "",
       }))
     }
   }
 
-  const handleTagRemove = (tag: string) => {
+  const handleKeywordRemove = (keyword: string) => {
     setFormData((prev) => ({
       ...prev,
-      tags: prev.tags.filter((t) => t !== tag),
+      keywords: prev.keywords.filter((k) => k !== keyword),
     }))
   }
 
@@ -318,19 +392,19 @@ export default function PublishPage() {
         setIsSubmitting(false)
         return
       }
-      if (!formData.category) {
+      if (!formData.department) {
         toast({
           title: "Validation Error",
-          description: "Please select a category",
+          description: "Please select a department",
           variant: "destructive",
         })
         setIsSubmitting(false)
         return
       }
-      if (formData.category === "custom" && !formData.customCategory.trim()) {
+      if (formData.department === "Custom" && !formData.customDepartment.trim()) {
         toast({
           title: "Validation Error",
-          description: "Please enter a custom category",
+          description: "Please enter a custom department",
           variant: "destructive",
         })
         setIsSubmitting(false)
@@ -366,6 +440,7 @@ export default function PublishPage() {
 
       // Check for userId (from login) or user_id (from API)
       let userId = (user as any)?.userId || (user as any)?.user_id
+      let isVerified = (user as any)?.is_verified ?? (user as any)?.isVerified ?? false
 
       // If userId is missing, try to fetch it from the API using email
       if (!userId && user?.email) {
@@ -384,11 +459,14 @@ export default function PublishPage() {
           const result = await response.json()
           if (result.status === "success" && result.user) {
             userId = result.user.user_id
+            isVerified = result.user.is_verified ?? false
             // Update localStorage with the correct user data
             const updatedUser = {
               ...user,
               userId: result.user.user_id,
               user_id: result.user.user_id,
+              is_verified: isVerified,
+              isVerified: isVerified,
             }
             localStorage.setItem("user", JSON.stringify(updatedUser))
             setUser(updatedUser)
@@ -410,13 +488,24 @@ export default function PublishPage() {
         return
       }
 
+      // Check if user is verified (unverified users cannot publish)
+      if (!isVerified) {
+        toast({
+          title: "Account Not Verified",
+          description: "Your account needs to be verified by an administrator before you can publish repositories. You can still login and download repositories.",
+          variant: "destructive",
+        })
+        setIsSubmitting(false)
+        return
+      }
+
       // Reset progress
       setUploadProgress(0)
 
-      // Determine final category and research type values
-      const finalCategory = formData.category === "custom"
-        ? formData.customCategory.trim()
-        : formData.category
+      // Determine final department and research type values
+      const finalDepartment = formData.department === "Custom"
+        ? formData.customDepartment.trim()
+        : formData.department
       const finalResearchType = formData.researchType === "Custom"
         ? formData.customResearchType.trim()
         : formData.researchType
@@ -427,9 +516,9 @@ export default function PublishPage() {
       formDataToSend.append("title", formData.title.trim())
       formDataToSend.append("abstract", formData.abstract.trim())
       formDataToSend.append("publisher", userId.toString())
-      formDataToSend.append("category", finalCategory)
+      formDataToSend.append("department", finalDepartment)
       formDataToSend.append("researchType", finalResearchType)
-      formDataToSend.append("tags", JSON.stringify(formData.tags))
+      formDataToSend.append("tags", JSON.stringify(formData.keywords))
       formDataToSend.append("pdfFile", pdfFile)
 
       // Call API with progress tracking using XMLHttpRequest
@@ -513,12 +602,12 @@ export default function PublishPage() {
         setFormData({
           title: "",
           abstract: "",
-          category: "",
-          customCategory: "",
+          department: "",
+          customDepartment: "",
           researchType: "",
           customResearchType: "",
-          tags: [],
-          tagInput: "",
+          keywords: [],
+          keywordInput: "",
         })
         setPdfFile(null)
         setPdfPreviewUrl(null)
@@ -584,11 +673,36 @@ export default function PublishPage() {
         </Button>
 
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Publish Research</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold text-foreground mb-2">Publish Research</h1>
+          <p className="text-sm text-muted-foreground">
             Share your research with the global academic community
           </p>
         </div>
+
+        {/* Verification Status Alert */}
+        {!isCheckingVerification && !isVerified && (
+          <div className="mb-6 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6">
+            <div className="flex items-start gap-4">
+              <div className="shrink-0">
+                <div className="w-10 h-10 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
+                  <FileText className="text-yellow-600 dark:text-yellow-400" size={20} />
+                </div>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-yellow-900 dark:text-yellow-200 mb-2">
+                  You are not yet verified
+                </h3>
+                <p className="text-yellow-800 dark:text-yellow-300 mb-3">
+                  Please wait, we're still reviewing your credentials. Your account is currently under review by our administrators.
+                </p>
+                <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                  While your account is being verified, you can still log in, browse repositories, and download research papers.
+                  Once your account is verified, you'll be able to publish your own research.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {success && (
           <div className="mb-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 flex items-center gap-3">
@@ -629,38 +743,41 @@ export default function PublishPage() {
             />
           </div>
 
-          {/* Category */}
+          {/* Department */}
           <div className="space-y-2">
-            <Label htmlFor="category" className="text-foreground font-medium">Category *</Label>
+            <Label htmlFor="department" className="text-foreground font-medium">Department *</Label>
             <Select
-              value={formData.category}
-              onValueChange={(value) => setFormData({ ...formData, category: value, customCategory: "" })}
-              disabled={isSubmitting || isLoadingCategories}
+              value={formData.department}
+              onValueChange={(value) => setFormData({ ...formData, department: value, customDepartment: "" })}
+              disabled={isSubmitting || isLoadingDepartments}
             >
               <SelectTrigger className="bg-input border-border">
-                <SelectValue placeholder="Select a category" />
+                <SelectValue placeholder="Select a department" />
               </SelectTrigger>
               <SelectContent>
-                {categories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.name}>
-                    {cat.name}
+                {departments.map((dept) => (
+                  <SelectItem key={dept.id} value={dept.name}>
+                    {dept.name}
                   </SelectItem>
                 ))}
-                <SelectItem value="custom">Custom (Other)</SelectItem>
+                <SelectSeparator />
+                <SelectItem value="Custom">
+                  Custom +
+                </SelectItem>
               </SelectContent>
             </Select>
-            {formData.category === "custom" && (
+            {formData.department === "Custom" && (
               <Input
                 type="text"
-                placeholder="Enter custom category"
-                value={formData.customCategory}
-                onChange={(e) => setFormData({ ...formData, customCategory: e.target.value })}
+                placeholder="Enter custom department"
+                value={formData.customDepartment}
+                onChange={(e) => setFormData({ ...formData, customDepartment: e.target.value })}
                 className="bg-input border-border mt-2"
                 disabled={isSubmitting}
               />
             )}
-            {!formData.category && (
-              <p className="text-sm text-muted-foreground">Select a category</p>
+            {!formData.department && (
+              <p className="text-sm text-muted-foreground">Select a department</p>
             )}
           </div>
 
@@ -670,17 +787,23 @@ export default function PublishPage() {
             <Select
               value={formData.researchType}
               onValueChange={(value) => setFormData({ ...formData, researchType: value, customResearchType: "" })}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isLoadingResearchTypes}
             >
               <SelectTrigger className="bg-input border-border">
                 <SelectValue placeholder="Select research type" />
               </SelectTrigger>
               <SelectContent>
-                {RESEARCH_TYPES.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
+                {researchTypes
+                  .filter((type) => type.name !== "Custom")
+                  .map((type) => (
+                    <SelectItem key={type.id} value={type.name}>
+                      {type.name}
+                    </SelectItem>
+                  ))}
+                <SelectSeparator />
+                <SelectItem value="Custom">
+                  Custom +
+                </SelectItem>
               </SelectContent>
             </Select>
             {formData.researchType === "Custom" && (
@@ -698,41 +821,41 @@ export default function PublishPage() {
             )}
           </div>
 
-          {/* Tags */}
+          {/* Keywords */}
           <div className="space-y-2">
-            <Label htmlFor="tags" className="text-foreground font-medium">
-              Tags
+            <Label htmlFor="keywords" className="text-foreground font-medium">
+              Keywords
             </Label>
             <div className="flex gap-2">
               <Input
-                id="tags"
+                id="keywords"
                 type="text"
-                placeholder="Enter a tag and press Enter"
-                value={formData.tagInput}
-                onChange={(e) => setFormData({ ...formData, tagInput: e.target.value })}
+                placeholder="Enter a keyword and press Enter"
+                value={formData.keywordInput}
+                onChange={(e) => setFormData({ ...formData, keywordInput: e.target.value })}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault()
-                    handleTagAdd()
+                    handleKeywordAdd()
                   }
                 }}
                 className="bg-input border-border"
               />
-              <Button type="button" onClick={handleTagAdd} variant="outline">
+              <Button type="button" onClick={handleKeywordAdd} variant="outline">
                 <Plus size={16} />
               </Button>
             </div>
-            {formData.tags.length > 0 && (
+            {formData.keywords.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2">
-                {formData.tags.map((tag) => (
+                {formData.keywords.map((keyword) => (
                   <span
-                    key={tag}
+                    key={keyword}
                     className="inline-flex items-center gap-1 px-2 py-1 bg-accent text-accent-foreground rounded text-sm"
                   >
-                    {tag}
+                    {keyword}
                     <button
                       type="button"
-                      onClick={() => handleTagRemove(tag)}
+                      onClick={() => handleKeywordRemove(keyword)}
                       className="hover:text-destructive"
                     >
                       <X size={14} />
@@ -849,7 +972,7 @@ export default function PublishPage() {
           <div className="flex gap-4 pt-4">
             <Button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !isVerified || isCheckingVerification}
               className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {isSubmitting ? "Publishing..." : "Publish Research"}
@@ -863,6 +986,11 @@ export default function PublishPage() {
               Cancel
             </Button>
           </div>
+          {!isVerified && !isCheckingVerification && (
+            <p className="text-sm text-muted-foreground text-center pt-2">
+              Publishing is disabled until your account is verified
+            </p>
+          )}
         </form>
       </div>
     </main>

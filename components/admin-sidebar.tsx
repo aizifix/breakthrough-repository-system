@@ -101,8 +101,8 @@ export default function AdminSidebar() {
         )}
       >
         <div className="flex flex-col h-full">
-          {/* Navbar section in sidebar */}
-          <div className="h-16 border-b border-border flex items-center justify-center px-4">
+          {/* Logo section */}
+          <div className="h-16 border-b border-border flex items-center justify-center px-4 flex-shrink-0">
             <div className={cn("flex items-center gap-2", isCollapsed && "justify-center w-full")}>
               <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center">
                 <span className="text-accent-foreground text-sm font-bold">BT</span>
@@ -115,27 +115,27 @@ export default function AdminSidebar() {
 
           {/* Navigation Items */}
           <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
-            const Icon = item.icon
-            const isActive = pathname === item.href || pathname?.startsWith(item.href + "/")
+            {navItems.map((item) => {
+              const Icon = item.icon
+              const isActive = pathname === item.href || pathname?.startsWith(item.href + "/")
 
-            return (
-              <Link key={item.href} href={item.href}>
-                <Button
-                  variant={isActive ? "secondary" : "ghost"}
-                  className={cn(
-                    "w-full justify-start gap-3 h-10",
-                    isCollapsed && "justify-center px-0",
-                    isActive && "bg-accent text-accent-foreground"
-                  )}
-                  title={isCollapsed ? item.title : undefined}
-                >
-                  <Icon size={20} className={cn("flex-shrink-0", isCollapsed && "mx-auto")} />
-                  {!isCollapsed && <span className="truncate">{item.title}</span>}
-                </Button>
-              </Link>
-            )
-          })}
+              return (
+                <Link key={item.href} href={item.href}>
+                  <Button
+                    variant={isActive ? "secondary" : "ghost"}
+                    className={cn(
+                      "w-full justify-start gap-3 h-10",
+                      isCollapsed && "justify-center px-0",
+                      isActive && "bg-accent text-accent-foreground"
+                    )}
+                    title={isCollapsed ? item.title : undefined}
+                  >
+                    <Icon size={20} className={cn("flex-shrink-0", isCollapsed && "mx-auto")} />
+                    {!isCollapsed && <span className="truncate">{item.title}</span>}
+                  </Button>
+                </Link>
+              )
+            })}
           </nav>
         </div>
       </aside>

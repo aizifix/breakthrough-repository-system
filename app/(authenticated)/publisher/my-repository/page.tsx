@@ -8,6 +8,7 @@ import FilterPanel, { type FilterState } from "@/components/filter-panel"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, Menu, Search, FileText } from "lucide-react"
+import { getPublisherRepositories } from "@/app/config/api"
 
 interface Repository {
   id: number | string
@@ -18,7 +19,7 @@ interface Repository {
     avatar: string
   }
   category: string[]
-  tags: string[]
+  keywords: string[]
   publishedDate: string | null
   publishedStatus: "pending" | "published" | "rejected" | "unpublished"
   pdfUrl?: string
@@ -38,7 +39,6 @@ export default function MyRepositoriesPage() {
     researchTypes: [],
     yearFrom: "",
     yearTo: "",
-    categories: [],
     keywords: "",
   })
   const [searchQuery, setSearchQuery] = useState("")
@@ -61,51 +61,51 @@ export default function MyRepositoriesPage() {
             // Check for userId (from login) or user_id (from API)
             const userId = userData.userId || userData.user_id
 
-            if (userId) {
-              try {
-                const response = await fetch("http://localhost/repository-api/publisher.php", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
-                    operation: "get_repositories",
-                    user_id: userId,
-                  }),
-                })
+             if (userId) {
+               try {
+                 const response = await getPublisherRepositories(userId, userId)
 
-                const result = await response.json()
-                console.log("API Response:", result)
-                console.log("User ID used:", userId)
-
-                if (result.status === "success" && result.data) {
-                  console.log("Repositories received:", result.data)
-                  // Format repositories to match expected structure
-                  const formattedRepos = result.data.map((repo: any) => ({
-                    ...repo,
-                    id: repo.id.toString(), // Ensure id is string for RepositoryCard
-                    publisher: {
-                      name: repo.publisher_name || "Unknown",
-                      avatar: (repo.publisher_name || "U")
-                        .split(" ")
-                        .map((n: string) => n[0])
-                        .join("")
-                        .toUpperCase()
-                        .slice(0, 2),
-                    },
-                    // Ensure category and tags are arrays
-                    category: Array.isArray(repo.category) ? repo.category : (repo.category ? [repo.category] : []),
-                    tags: Array.isArray(repo.tags) ? repo.tags : (repo.tags ? [repo.tags] : []),
-                  }))
-                  console.log("Formatted repositories:", formattedRepos)
-                  setRepositories(formattedRepos)
-                } else {
-                  console.error("API returned error or no data:", result)
-                }
-              } catch (error) {
-                console.error("Error fetching repositories:", error)
-              }
-            }
+                 if (response.status === "success" && response.data) {
+                   // Format repositories to match expected structure
+                   const formattedRepos = response.data.map((repo: any) => ({
+                     ...repo,
+                     id: repo.id.toString(), // Ensure id is string for RepositoryCard
+                     publisher: {
+                       name: repo.publisher_name || "Unknown",
+                       avatar: (repo.publisher_name || "U")
+                         .split(" ")
+                         .map((n: string) => n[0])
+                         .join("")
+                         .toUpperCase()
+                         .slice(0, 2),
+                       isVerified: repo.publisher_is_verified ?? false,
+                     },
+                     // Ensure category and keywords are arrays
+                     category: Array.isArray(repo.category) ? repo.category : (repo.category ? [repo.category] : []),
+                     keywords: Array.isArray(repo.tags) ? repo.tags : (repo.tags ? [repo.tags] : []),
+                     views: repo.views ?? 0,
+                     likes: repo.likes ?? 0,
+                     isLiked: repo.isLiked ?? false,
+                     rating: repo.rating ?? 0,
+                     ratingCount: repo.rating_count ?? 0,
+                   }))
+                   setRepositories(formattedRepos)
+                 } else {
+                   setRepositories([])
+                   if (response.message) {
+                     console.error("API Error:", response.message)
+                   }
+                 }
+               } catch (error: any) {
+                 console.error("Error fetching repositories:", error)
+                 setRepositories([])
+                 if (error.response) {
+                   console.error("Response error:", error.response.data)
+                 } else if (error.request) {
+                   console.error("Request error:", error.request)
+                 }
+               }
+             }
           } catch (e) {
             router.push("/auth/login")
           }
@@ -124,44 +124,42 @@ export default function MyRepositoriesPage() {
     // Check for userId (from login) or user_id (from API)
     const userId = (user as any)?.userId || (user as any)?.user_id
 
-    if (userId) {
-      try {
-        const response = await fetch("http://localhost/repository-api/publisher.php", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            operation: "get_repositories",
-            user_id: userId,
-          }),
-        })
+     if (userId) {
+       try {
+         const response = await getPublisherRepositories(userId)
 
-        const result = await response.json()
-
-        if (result.status === "success" && result.data) {
-          const formattedRepos = result.data.map((repo: any) => ({
-            ...repo,
-            id: repo.id.toString(), // Ensure id is string for RepositoryCard
-            publisher: {
-              name: repo.publisher_name || "Unknown",
-              avatar: (repo.publisher_name || "U")
-                .split(" ")
-                .map((n: string) => n[0])
-                .join("")
-                .toUpperCase()
-                .slice(0, 2),
-            },
-            // Ensure category and tags are arrays
-            category: Array.isArray(repo.category) ? repo.category : (repo.category ? [repo.category] : []),
-            tags: Array.isArray(repo.tags) ? repo.tags : (repo.tags ? [repo.tags] : []),
-          }))
-          setRepositories(formattedRepos)
-        }
-      } catch (error) {
-        console.error("Error fetching repositories:", error)
-      }
-    }
+         if (response.status === "success" && response.data) {
+           const formattedRepos = response.data.map((repo: any) => ({
+             ...repo,
+             id: repo.id.toString(), // Ensure id is string for RepositoryCard
+             publisher: {
+               name: repo.publisher_name || "Unknown",
+               avatar: (repo.publisher_name || "U")
+                 .split(" ")
+                 .map((n: string) => n[0])
+                 .join("")
+                 .toUpperCase()
+                 .slice(0, 2),
+               isVerified: repo.publisher_is_verified ?? false,
+             },
+             // Ensure category and keywords are arrays
+             category: Array.isArray(repo.category) ? repo.category : (repo.category ? [repo.category] : []),
+             keywords: Array.isArray(repo.tags) ? repo.tags : (repo.tags ? [repo.tags] : []),
+             views: repo.views ?? 0,
+             likes: repo.likes ?? 0,
+             isLiked: repo.isLiked ?? false,
+             rating: repo.rating ?? 0,
+             ratingCount: repo.rating_count ?? 0,
+           }))
+           setRepositories(formattedRepos)
+         } else {
+           setRepositories([])
+         }
+       } catch (error: any) {
+         console.error("Error fetching repositories:", error)
+         setRepositories([])
+       }
+     }
   }
 
   // Listen for focus event to refresh data
@@ -183,18 +181,11 @@ export default function MyRepositoriesPage() {
         const matches =
           repo.title.toLowerCase().includes(query) ||
           repo.abstract.toLowerCase().includes(query) ||
-          repo.tags.some((tag) => tag.toLowerCase().includes(query)) ||
+          repo.keywords.some((keyword) => keyword.toLowerCase().includes(query)) ||
           repo.category.some((cat) => cat.toLowerCase().includes(query))
         if (!matches) return false
       }
 
-      // Filter by category
-      if (filters.categories.length > 0) {
-        const hasCategoryMatch = filters.categories.some((cat) =>
-          repo.category.includes(cat)
-        )
-        if (!hasCategoryMatch) return false
-      }
 
       // Filter by year range
       if (repo.publishedDate) {
@@ -232,8 +223,8 @@ export default function MyRepositoriesPage() {
         {/* Header Section */}
         <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">My Repository</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl font-bold text-foreground mb-2">My Repository</h1>
+            <p className="text-sm text-muted-foreground">
               Manage and view all your published research repositories
             </p>
           </div>
@@ -318,10 +309,15 @@ export default function MyRepositoriesPage() {
                       abstract={repo.abstract}
                       publisher={publisherObj}
                       category={repo.category}
-                      tags={repo.tags}
+                      tags={repo.keywords}
                       publishedDate={repo.publishedDate}
                       publishedStatus={repo.publishedStatus as "pending" | "published" | "rejected" | "unpublished"}
                       pdfUrl={repo.pdfUrl}
+                      views={repo.views}
+                      likes={repo.likes}
+                      isLiked={repo.isLiked}
+                      rating={repo.rating}
+                      ratingCount={repo.ratingCount}
                       user={user}
                       detailPath="/publisher/my-repository"
                       onViewClick={() => {
@@ -355,7 +351,7 @@ export default function MyRepositoriesPage() {
               </div>
             ) : (
               <div className="text-center py-12">
-                <p className="text-lg text-muted-foreground mb-2">No repositories found</p>
+                <p className="text-sm text-muted-foreground mb-2">No repositories found</p>
                 <p className="text-sm text-muted-foreground">
                   Try adjusting your filters or search terms
                 </p>
@@ -383,7 +379,7 @@ export default function MyRepositoriesPage() {
               ? selectedRepository.publisher
               : { name: 'Unknown', avatar: 'U' },
             category: selectedRepository.category,
-            tags: selectedRepository.tags,
+            tags: selectedRepository.keywords,
             publishedDate: selectedRepository.publishedDate,
             publishedStatus: selectedRepository.publishedStatus,
             pdfUrl: selectedRepository.pdfUrl,

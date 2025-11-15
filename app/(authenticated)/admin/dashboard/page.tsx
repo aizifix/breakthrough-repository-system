@@ -153,14 +153,14 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
-              <Shield className="text-primary" size={28} />
+              <Shield className="text-primary" size={24} />
               <div>
-                <h1 className="text-3xl font-bold text-foreground">Admin Dashboard</h1>
+                <h1 className="text-2xl font-bold text-foreground">Admin Dashboard</h1>
                 <p className="text-muted-foreground">
                   Overview of the repository system and quick access to administrative functions
                 </p>
@@ -200,7 +200,7 @@ export default function AdminDashboardPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-foreground mb-1">
+                  <div className="text-2xl font-bold text-foreground mb-1">
                     {stats?.totalUsers.toLocaleString() || 0}
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -220,7 +220,7 @@ export default function AdminDashboardPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-foreground mb-1">
+                  <div className="text-2xl font-bold text-foreground mb-1">
                     {stats?.totalRepositories.toLocaleString() || 0}
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -240,7 +240,7 @@ export default function AdminDashboardPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-yellow-600 mb-1">
+                  <div className="text-2xl font-bold text-yellow-600 mb-1">
                     {stats?.pendingModeration || 0}
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -260,7 +260,7 @@ export default function AdminDashboardPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-green-600 mb-1">
+                  <div className="text-2xl font-bold text-green-600 mb-1">
                     {stats?.publishedToday || 0}
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -280,7 +280,7 @@ export default function AdminDashboardPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-foreground mb-1">
+                  <div className="text-2xl font-bold text-foreground mb-1">
                     {stats?.publishedThisWeek || 0}
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -300,7 +300,7 @@ export default function AdminDashboardPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-red-600 mb-1">
+                  <div className="text-2xl font-bold text-red-600 mb-1">
                     {stats?.rejectedThisWeek || 0}
                   </div>
                   <p className="text-xs text-muted-foreground">

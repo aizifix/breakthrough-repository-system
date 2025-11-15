@@ -28,6 +28,7 @@ import {
   Trash2,
   Eye,
   X,
+  MoreVertical,
 } from "lucide-react"
 import {
   Dialog,
@@ -38,20 +39,33 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { getAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement } from "@/app/config/api"
 
 interface Announcement {
-  id: string
+  id: number | string
   title: string
   content: string
-  published: boolean
-  createdAt: string
-  updatedAt: string
-  createdBy: string
+  published: boolean | number
+  created_at: string
+  updated_at: string
+  created_by_name?: string
+  created_by?: number
+  createdAt?: string
+  updatedAt?: string
+  createdBy?: string
 }
 
 export default function AnnouncementsPage() {
   const router = useRouter()
-  const [user, setUser] = useState<{ name: string; email: string; role?: string } | null>(null)
+  const [user, setUser] = useState<{ name: string; email: string; role?: string; userId?: number; user_id?: number } | null>(null)
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
@@ -62,6 +76,7 @@ export default function AnnouncementsPage() {
     published: false,
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -71,64 +86,41 @@ export default function AnnouncementsPage() {
         setUser(userData)
         if (userData.role !== "admin") {
           router.push("/")
+        } else {
+          loadAnnouncements()
         }
       } else {
         router.push("/auth/login")
       }
-      loadAnnouncements()
     }
   }, [router])
 
-  const loadAnnouncements = () => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("adminAnnouncements")
-      if (stored) {
-        setAnnouncements(JSON.parse(stored))
+  const loadAnnouncements = async () => {
+    try {
+      setIsLoading(true)
+      const response = await getAnnouncements(false)
+      if (response.status === "success" && response.data) {
+        setAnnouncements(response.data)
       } else {
-        // Sample announcements
-        const sampleAnnouncements: Announcement[] = [
-          {
-            id: "1",
-            title: "Welcome to Breakthrough Research Repository",
-            content: "We're excited to announce the launch of our new research repository platform. Share and discover cutting-edge research across multiple disciplines.",
-            published: true,
-            createdAt: "2024-01-15T10:00:00Z",
-            updatedAt: "2024-01-15T10:00:00Z",
-            createdBy: "Admin",
-          },
-          {
-            id: "2",
-            title: "New Feature: Enhanced Search Capabilities",
-            content: "We've improved our search functionality with advanced filters and keyword matching. Try it out and let us know what you think!",
-            published: true,
-            createdAt: "2024-02-01T14:30:00Z",
-            updatedAt: "2024-02-01T14:30:00Z",
-            createdBy: "Admin",
-          },
-          {
-            id: "3",
-            title: "Maintenance Scheduled for Next Week",
-            content: "We will be performing scheduled maintenance on March 15th from 2 AM to 4 AM EST. The platform will be temporarily unavailable during this time.",
-            published: false,
-            createdAt: "2024-03-10T09:00:00Z",
-            updatedAt: "2024-03-10T09:00:00Z",
-            createdBy: "Admin",
-          },
-        ]
-        setAnnouncements(sampleAnnouncements)
-        localStorage.setItem("adminAnnouncements", JSON.stringify(sampleAnnouncements))
+        setAnnouncements([])
       }
+    } catch (error) {
+      console.error("Error loading announcements:", error)
+      setAnnouncements([])
+    } finally {
+      setIsLoading(false)
     }
   }
 
   const handleOpenDialog = (announcement?: Announcement) => {
     if (announcement) {
+      const normalized = normalizeAnnouncement(announcement)
       setIsEditMode(true)
-      setEditingAnnouncement(announcement)
+      setEditingAnnouncement(normalized)
       setFormData({
-        title: announcement.title,
-        content: announcement.content,
-        published: announcement.published,
+        title: normalized.title,
+        content: normalized.content,
+        published: typeof normalized.published === "boolean" ? normalized.published : normalized.published === 1,
       })
     } else {
       setIsEditMode(false)
@@ -164,70 +156,88 @@ export default function AnnouncementsPage() {
         return
       }
 
-      const now = new Date().toISOString()
+      const userId = user?.userId || user?.user_id
+      if (!userId) {
+        alert("User ID not found. Please log in again.")
+        setIsSubmitting(false)
+        return
+      }
 
       if (isEditMode && editingAnnouncement) {
         // Update existing announcement
-        const updated = announcements.map((ann) =>
-          ann.id === editingAnnouncement.id
-            ? {
-                ...ann,
-                title: formData.title.trim(),
-                content: formData.content.trim(),
-                published: formData.published,
-                updatedAt: now,
-              }
-            : ann
-        )
-        setAnnouncements(updated)
-        localStorage.setItem("adminAnnouncements", JSON.stringify(updated))
-      } else {
-        // Create new announcement
-        const newAnnouncement: Announcement = {
-          id: Date.now().toString(),
+        const response = await updateAnnouncement(Number(editingAnnouncement.id), {
           title: formData.title.trim(),
           content: formData.content.trim(),
           published: formData.published,
-          createdAt: now,
-          updatedAt: now,
-          createdBy: user?.name || "Admin",
+        })
+        if (response.status === "success") {
+          await loadAnnouncements()
+          handleCloseDialog()
+        } else {
+          alert(response.message || "Failed to update announcement. Please try again.")
         }
-        const updated = [...announcements, newAnnouncement]
-        setAnnouncements(updated)
-        localStorage.setItem("adminAnnouncements", JSON.stringify(updated))
+      } else {
+        // Create new announcement
+        const response = await createAnnouncement({
+          title: formData.title.trim(),
+          content: formData.content.trim(),
+          published: formData.published,
+          created_by: userId,
+        })
+        if (response.status === "success") {
+          await loadAnnouncements()
+          handleCloseDialog()
+        } else {
+          alert(response.message || "Failed to create announcement. Please try again.")
+        }
       }
-
-      handleCloseDialog()
     } catch (error) {
+      console.error("Error saving announcement:", error)
       alert("Failed to save announcement. Please try again.")
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: number | string) => {
     if (confirm("Are you sure you want to delete this announcement?")) {
-      const updated = announcements.filter((ann) => ann.id !== id)
-      setAnnouncements(updated)
-      localStorage.setItem("adminAnnouncements", JSON.stringify(updated))
+      try {
+        const response = await deleteAnnouncement(Number(id))
+        if (response.status === "success") {
+          await loadAnnouncements()
+        } else {
+          alert(response.message || "Failed to delete announcement. Please try again.")
+        }
+      } catch (error) {
+        console.error("Error deleting announcement:", error)
+        alert("Failed to delete announcement. Please try again.")
+      }
     }
   }
 
-  const handleTogglePublish = (id: string) => {
-    const updated = announcements.map((ann) =>
-      ann.id === id
-        ? {
-            ...ann,
-            published: !ann.published,
-            updatedAt: new Date().toISOString(),
-          }
-        : ann
-    )
-    setAnnouncements(updated)
-    localStorage.setItem("adminAnnouncements", JSON.stringify(updated))
+  const handleTogglePublish = async (id: number | string) => {
+    const announcement = announcements.find((ann) => ann.id === id)
+    if (!announcement) return
+
+    try {
+      const response = await updateAnnouncement(Number(id), {
+        title: announcement.title,
+        content: announcement.content,
+        published: !announcement.published,
+      })
+      if (response.status === "success") {
+        await loadAnnouncements()
+      } else {
+        alert(response.message || "Failed to update announcement. Please try again.")
+      }
+    } catch (error) {
+      console.error("Error toggling publish:", error)
+      alert("Failed to update announcement. Please try again.")
+    }
   }
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return "N/A"
     const date = new Date(dateString)
     return date.toLocaleDateString("en-US", {
       year: "numeric",
@@ -238,20 +248,31 @@ export default function AnnouncementsPage() {
     })
   }
 
+  const normalizeAnnouncement = (ann: Announcement): Announcement => {
+    return {
+      ...ann,
+      id: ann.id,
+      published: typeof ann.published === "number" ? ann.published === 1 : ann.published,
+      createdAt: ann.created_at || ann.createdAt,
+      updatedAt: ann.updated_at || ann.updatedAt,
+      createdBy: ann.created_by_name || ann.createdBy || "Admin",
+    }
+  }
+
   if (!user) {
     return null
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <Megaphone className="text-primary" size={28} />
+              <Megaphone className="text-primary" size={24} />
               <div>
-                <h1 className="text-3xl font-bold text-foreground">Announcements</h1>
+                <h1 className="text-2xl font-bold text-foreground">Announcements</h1>
                 <p className="text-muted-foreground">
                   Manage system-wide announcements and notifications
                 </p>
@@ -329,72 +350,101 @@ export default function AnnouncementsPage() {
                 </Button>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Updated</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
+              <div className="overflow-x-auto -mx-6 px-6">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[250px]">Title</TableHead>
+                      <TableHead className="min-w-[100px]">Status</TableHead>
+                      <TableHead className="min-w-[120px]">Created</TableHead>
+                      <TableHead className="min-w-[120px]">Updated</TableHead>
+                      <TableHead className="text-right min-w-[120px] sticky right-0 bg-card z-10 border-l border-border">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
                 <TableBody>
-                  {announcements.map((announcement) => (
-                    <TableRow key={announcement.id}>
-                      <TableCell className="font-medium">
-                        {announcement.title}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={announcement.published ? "default" : "secondary"}
-                        >
-                          {announcement.published ? "Published" : "Draft"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                          {formatDate(announcement.createdAt)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {formatDate(announcement.updatedAt)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleTogglePublish(announcement.id)}
-                            title={announcement.published ? "Unpublish" : "Publish"}
-                          >
-                            {announcement.published ? (
-                              <X size={16} />
-                            ) : (
-                              <Eye size={16} />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleOpenDialog(announcement)}
-                          >
-                            <FileText size={16} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(announcement.id)}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 size={16} />
-                          </Button>
-                        </div>
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
+                        <p className="text-muted-foreground mt-2">Loading announcements...</p>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : announcements.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8">
+                        <p className="text-muted-foreground">No announcements found</p>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    announcements.map((announcement) => {
+                      const normalized = normalizeAnnouncement(announcement)
+                      return (
+                        <TableRow key={normalized.id}>
+                          <TableCell className="font-medium">
+                            <div className="truncate max-w-[300px]" title={normalized.title}>
+                              {normalized.title}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={normalized.published ? "default" : "secondary"}
+                            >
+                              {normalized.published ? "Published" : "Draft"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            <div className="flex items-center gap-2">
+                              {formatDate(normalized.createdAt || normalized.created_at)}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {formatDate(normalized.updatedAt || normalized.updated_at)}
+                          </TableCell>
+                          <TableCell className="text-right sticky right-0 bg-card z-10 border-l border-border">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <MoreVertical size={16} />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleTogglePublish(normalized.id)}>
+                                  {normalized.published ? (
+                                    <>
+                                      <X size={16} className="mr-2" />
+                                      Unpublish
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Eye size={16} className="mr-2" />
+                                      Publish
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleOpenDialog(normalized)}>
+                                  <FileText size={16} className="mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => handleDelete(normalized.id)}
+                                  className="text-destructive"
+                                >
+                                  <Trash2 size={16} className="mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
+                  )}
                 </TableBody>
-              </Table>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>

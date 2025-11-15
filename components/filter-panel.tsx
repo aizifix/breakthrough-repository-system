@@ -25,7 +25,6 @@ export interface FilterState {
   researchTypes: string[]
   yearFrom: string
   yearTo: string
-  categories: string[]
   keywords: string
 }
 
@@ -44,12 +43,10 @@ export default function FilterPanel({ onFilterChange, onSearch, isOpen, onClose 
     researchTypes: [],
     yearFrom: "",
     yearTo: "",
-    categories: [],
     keywords: "",
   })
   const [departments, setDepartments] = useState<FilterOption[]>([])
   const [researchTypes, setResearchTypes] = useState<FilterOption[]>([])
-  const [categories, setCategories] = useState<FilterOption[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   // Load filter options from API
@@ -61,7 +58,6 @@ export default function FilterPanel({ onFilterChange, onSearch, isOpen, onClose 
         if (result.status === "success") {
           setDepartments(result.data.departments || [])
           setResearchTypes(result.data.researchTypes || [])
-          setCategories(result.data.categories || [])
         }
       } catch (error) {
         console.error("Failed to load filters:", error)
@@ -105,7 +101,6 @@ export default function FilterPanel({ onFilterChange, onSearch, isOpen, onClose 
       researchTypes: [],
       yearFrom: "",
       yearTo: "",
-      categories: [],
       keywords: "",
     }
     setFilters(emptyFilters)
@@ -117,7 +112,6 @@ export default function FilterPanel({ onFilterChange, onSearch, isOpen, onClose 
     filters.departments.length +
     filters.researchTypes.length +
     (filters.yearFrom || filters.yearTo ? 1 : 0) +
-    filters.categories.length +
     (filters.keywords ? 1 : 0)
 
   return (
@@ -261,31 +255,6 @@ export default function FilterPanel({ onFilterChange, onSearch, isOpen, onClose 
               </Button>
             )}
           </div>
-        </div>
-
-        {/* Categories */}
-        <div className="mb-6">
-          <h3 className="font-semibold text-foreground mb-3 text-sm">Category</h3>
-          {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading...</p>
-          ) : (
-            <div className="space-y-2">
-              {categories.map((cat) => (
-                <label key={cat.id} className="flex items-center gap-2 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={filters.categories.includes(cat.name)}
-                    onChange={() => handleCheckboxChange("categories", cat.name)}
-                    className="rounded border-border"
-                    aria-label={`Filter by category: ${cat.name}`}
-                  />
-                  <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                    {cat.name}
-                  </span>
-                </label>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Action Buttons */}

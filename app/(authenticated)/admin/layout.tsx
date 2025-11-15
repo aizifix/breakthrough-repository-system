@@ -80,21 +80,21 @@ export default function AdminLayout({
     : undefined
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-background overflow-x-hidden">
       <AdminSidebar />
       <div
         className={cn(
-          "flex-1 flex flex-col transition-all duration-300",
+          "flex-1 flex flex-col transition-all duration-300 min-w-0",
           isSidebarCollapsed ? "ml-16" : "ml-64"
         )}
       >
-        {/* Navbar positioned after sidebar */}
+        {/* Navbar positioned after sidebar - aligned with sidebar logo border */}
         <div className="sticky top-0 z-30">
           <Navbar user={navbarUser} hideLogo={true} />
         </div>
 
         {/* Main content */}
-        <main className="flex-1">
+        <main className="flex-1 min-w-0 overflow-x-hidden">
           {children}
         </main>
       </div>

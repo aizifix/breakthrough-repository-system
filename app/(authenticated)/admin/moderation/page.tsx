@@ -37,6 +37,7 @@ import {
   User,
   FileText,
   AlertCircle,
+  MoreVertical,
 } from "lucide-react"
 import {
   Dialog,
@@ -47,6 +48,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { getRepositoriesForModeration, approveRepository, rejectRepository } from "@/app/config/api"
 
 interface Repository {
@@ -293,14 +302,14 @@ export default function ModerationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden">
-      <div className="max-w-7xl mx-auto px-4 py-8 w-full">
+    <div className="min-h-screen bg-background">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex items-center gap-3 mb-4">
-            <Shield className="text-primary" size={28} />
+            <Shield className="text-primary" size={24} />
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Content Moderation</h1>
+              <h1 className="text-2xl font-bold text-foreground">Content Moderation</h1>
               <p className="text-muted-foreground">
                 Review and moderate submitted research repositories
               </p>
@@ -417,7 +426,7 @@ export default function ModerationPage() {
                       <TableHead className="min-w-[180px]">Category</TableHead>
                       <TableHead className="min-w-[100px]">Status</TableHead>
                       <TableHead className="min-w-[150px]">Submitted</TableHead>
-                      <TableHead className="text-right min-w-[120px]">Actions</TableHead>
+                      <TableHead className="text-right min-w-[120px] sticky right-0 bg-card z-10 border-l border-border">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -436,7 +445,9 @@ export default function ModerationPage() {
                       return (
                         <TableRow key={repo.id}>
                           <TableCell className="min-w-[200px]">
-                            <div className="font-medium">{repo.title}</div>
+                            <div className="font-medium truncate max-w-[300px]" title={repo.title}>
+                              {repo.title}
+                            </div>
                           </TableCell>
                           <TableCell className="min-w-[150px]">
                             <div className="flex items-center gap-2">
@@ -468,36 +479,40 @@ export default function ModerationPage() {
                               {formatDate(repo.submittedAt || repo.created_at || repo.publishedDate)}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right min-w-[120px]">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleViewRepository(repo)}
-                              >
-                                <Eye size={16} />
-                              </Button>
-                              {repo.publishedStatus === "pending" && (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleModerate(repo, "approve")}
-                                    className="text-green-600 hover:text-green-700"
-                                  >
-                                    <CheckCircle2 size={16} />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleModerate(repo, "reject")}
-                                    className="text-red-600 hover:text-red-700"
-                                  >
-                                    <XCircle size={16} />
-                                  </Button>
-                                </>
-                              )}
-                            </div>
+                          <TableCell className="text-right min-w-[120px] sticky right-0 bg-card z-10 border-l border-border">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <MoreVertical size={16} />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleViewRepository(repo)}>
+                                  <Eye size={16} className="mr-2" />
+                                  View Repository
+                                </DropdownMenuItem>
+                                {repo.publishedStatus === "pending" && (
+                                  <>
+                                    <DropdownMenuItem
+                                      onClick={() => handleModerate(repo, "approve")}
+                                      className="text-green-600"
+                                    >
+                                      <CheckCircle2 size={16} className="mr-2" />
+                                      Approve
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => handleModerate(repo, "reject")}
+                                      className="text-red-600"
+                                    >
+                                      <XCircle size={16} className="mr-2" />
+                                      Reject
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       )

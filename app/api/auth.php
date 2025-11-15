@@ -18,6 +18,29 @@ class Auth {
         $this->conn = $db;
     }
 
+    // Generate unique user ID in format COC-BT-XXXXXX
+    private function generateUniqueId() {
+        // Get the highest existing number from user_unique_id
+        $stmt = $this->conn->prepare("SELECT user_unique_id FROM tbl_users WHERE user_unique_id LIKE 'COC-BT-%' ORDER BY user_unique_id DESC LIMIT 1");
+        $stmt->execute();
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($result && $result['user_unique_id']) {
+            // Extract the number part and increment
+            $parts = explode('-', $result['user_unique_id']);
+            $lastNumber = isset($parts[2]) ? (int)$parts[2] : 0;
+            $nextNumber = $lastNumber + 1;
+        } else {
+            // Start from 1 if no existing IDs
+            $nextNumber = 1;
+        }
+
+        // Format as 6-digit number with leading zeros
+        $formattedNumber = str_pad($nextNumber, 6, '0', STR_PAD_LEFT);
+
+        return "COC-BT-" . $formattedNumber;
+    }
+
     // Register new user
     public function register($data) {
         try {
@@ -47,13 +70,16 @@ class Auth {
             // Hash password
             $hashedPassword = password_hash($data['user_pwd'], PASSWORD_DEFAULT);
 
+            // Generate unique user ID
+            $uniqueId = $this->generateUniqueId();
+
             // Insert into tbl_users
             $sql = "INSERT INTO tbl_users (
                 user_name, user_email, user_pwd, user_school,
-                user_department, user_role, user_type, user_contact, user_address
+                user_department, user_role, user_type, user_contact, user_address, user_unique_id
             ) VALUES (
                 :user_name, :user_email, :user_pwd, :user_school,
-                :user_department, :user_role, :user_type, :user_contact, :user_address
+                :user_department, :user_role, :user_type, :user_contact, :user_address, :user_unique_id
             )";
 
             $stmt = $this->conn->prepare($sql);
@@ -66,7 +92,8 @@ class Auth {
                 ':user_role' => 'publisher', // Default role
                 ':user_type' => $data['user_type'] ?? null,
                 ':user_contact' => $data['user_contact'] ?? null,
-                ':user_address' => $data['user_address'] ?? null
+                ':user_address' => $data['user_address'] ?? null,
+                ':user_unique_id' => $uniqueId
             ]);
 
             $userId = $this->conn->lastInsertId();
@@ -76,7 +103,8 @@ class Auth {
             return json_encode([
                 "status" => "success",
                 "message" => "Registration successful!",
-                "user_id" => $userId
+                "user_id" => $userId,
+                "user_unique_id" => $uniqueId
             ]);
         } catch (PDOException $e) {
             $this->conn->rollBack();
@@ -147,7 +175,7 @@ class Auth {
                 return json_encode(["status" => "error", "message" => "Email is required"]);
             }
 
-            $sql = "SELECT user_id, user_name, user_email, user_role, user_school, user_department FROM tbl_users WHERE user_email = :email";
+            $sql = "SELECT user_id, user_name, user_email, user_role, user_school, user_department, user_type, user_contact, user_address, user_unique_id FROM tbl_users WHERE user_email = :email";
             $stmt = $this->conn->prepare($sql);
             $stmt->execute([':email' => $email]);
 
@@ -156,6 +184,64 @@ class Auth {
             }
 
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            // Try to get is_verified separately if column exists
+            try {
+                $verifyStmt = $this->conn->prepare("SELECT COALESCE(is_verified, 0) as is_verified FROM tbl_users WHERE user_email = :email");
+                $verifyStmt->execute([':email' => $email]);
+                $verifyResult = $verifyStmt->fetch(PDO::FETCH_ASSOC);
+                if ($verifyResult) {
+                    $user['is_verified'] = (bool)((int)$verifyResult['is_verified']);
+                } else {
+                    $user['is_verified'] = false;
+                }
+            } catch (PDOException $e) {
+                // Column doesn't exist, default to false
+                error_log("is_verified column may not exist: " . $e->getMessage());
+                $user['is_verified'] = false;
+            }
+
+            return json_encode([
+                "status" => "success",
+                "user" => $user
+            ]);
+        } catch (PDOException $e) {
+            return json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
+        }
+    }
+
+    // Get user profile by user ID
+    public function getUserProfile($userId) {
+        try {
+            if (empty($userId)) {
+                return json_encode(["status" => "error", "message" => "User ID is required"]);
+            }
+
+            $sql = "SELECT user_id, user_name, user_email, user_role, user_school, user_department, user_type, user_contact, user_address, user_unique_id FROM tbl_users WHERE user_id = :user_id";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute([':user_id' => $userId]);
+
+            if ($stmt->rowCount() === 0) {
+                return json_encode(["status" => "error", "message" => "User not found"]);
+            }
+
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            // Try to get is_verified separately if column exists
+            try {
+                $verifyStmt = $this->conn->prepare("SELECT COALESCE(is_verified, 0) as is_verified FROM tbl_users WHERE user_id = :user_id");
+                $verifyStmt->execute([':user_id' => $userId]);
+                $verifyResult = $verifyStmt->fetch(PDO::FETCH_ASSOC);
+                if ($verifyResult) {
+                    $user['is_verified'] = (bool)((int)$verifyResult['is_verified']);
+                } else {
+                    $user['is_verified'] = false;
+                }
+            } catch (PDOException $e) {
+                // Column doesn't exist, default to false
+                error_log("is_verified column may not exist: " . $e->getMessage());
+                $user['is_verified'] = false;
+            }
 
             return json_encode([
                 "status" => "success",
@@ -210,6 +296,11 @@ try {
         case "get_user_by_email":
             $email = $_POST['email'] ?? ($jsonData['email'] ?? '');
             echo $auth->getUserByEmail($email);
+            break;
+
+        case "get_user_profile":
+            $userId = $_POST['user_id'] ?? ($jsonData['user_id'] ?? '');
+            echo $auth->getUserProfile($userId);
             break;
 
         default:

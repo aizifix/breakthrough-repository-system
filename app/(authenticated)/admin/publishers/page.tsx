@@ -38,6 +38,7 @@ import {
   Building2,
   Plus,
   ArrowRight,
+  MoreVertical,
 } from "lucide-react"
 import {
   Dialog,
@@ -285,13 +286,13 @@ export default function PublishersPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex items-center gap-3 mb-4">
-            <FileText className="text-primary" size={28} />
+            <FileText className="text-primary" size={24} />
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Publishers</h1>
+              <h1 className="text-2xl font-bold text-foreground">Publishers</h1>
               <p className="text-muted-foreground">
                 Manage publishers and their repositories
               </p>
@@ -470,18 +471,15 @@ export default function PublishersPage() {
                                   <TableHead>Category</TableHead>
                                   <TableHead>Status</TableHead>
                                   <TableHead>Date</TableHead>
-                                  <TableHead className="text-right">Actions</TableHead>
+                                  <TableHead className="text-right sticky right-0 bg-card z-10 border-l border-border">Actions</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
                                 {publisher.repositories.map((repo) => (
                                   <TableRow key={repo.id}>
                                     <TableCell>
-                                      <div>
-                                        <div className="font-medium">{repo.title}</div>
-                                        <div className="text-sm text-muted-foreground line-clamp-1 mt-1">
-                                          {repo.abstract}
-                                        </div>
+                                      <div className="font-medium truncate max-w-[300px]" title={repo.title}>
+                                        {repo.title}
                                       </div>
                                     </TableCell>
                                     <TableCell>
@@ -499,11 +497,11 @@ export default function PublishersPage() {
                                         {formatDate(repo.publishedDate || repo.created_at)}
                                       </div>
                                     </TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="text-right sticky right-0 bg-card z-10 border-l border-border">
                                       <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                          <Button variant="ghost" size="sm">
-                                            Actions
+                                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                            <MoreVertical size={16} />
                                           </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">

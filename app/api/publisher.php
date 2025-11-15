@@ -105,7 +105,7 @@ class Publisher {
             error_log("Publisher createRepository - PDF file: " . print_r($pdfFile, true));
 
             // Required fields validation
-            $required = ['title', 'abstract', 'publisher', 'category', 'researchType'];
+            $required = ['title', 'abstract', 'publisher', 'department', 'researchType'];
             foreach ($required as $field) {
                 if (empty($data[$field])) {
                     $this->conn->rollBack();
@@ -290,8 +290,9 @@ class Publisher {
                 return json_encode(["status" => "error", "message" => "PDF file is required"]);
             }
 
-            // Prepare category (now single string, not array)
-            $category = trim($data['category']);
+            // Prepare category/department (now single string, not array)
+            // Frontend sends 'department', but database column is 'category'
+            $category = trim($data['department'] ?? $data['category'] ?? '');
 
             // Prepare research type
             $researchType = trim($data['researchType']);
@@ -410,44 +411,100 @@ class Publisher {
     }
 
     // Get publisher repositories
-    public function getRepositories($userId = null) {
+    public function getRepositories($userId = null, $currentUserId = null) {
         try {
             if ($userId) {
-                // Get repositories for specific user
+                // Get repositories for specific user (all statuses - for "My Repositories" page)
+                // Note: For public display, use getPublishedRepositories instead
                 $sql = "SELECT
                     r.*,
                     u.user_name AS publisher_name,
                     u.user_email AS publisher_email,
                     u.user_school AS publisher_school,
-                    u.user_department AS publisher_department
+                    u.user_department AS publisher_department,
+                    COALESCE(r.view_count, 0) AS views,
+                    COALESCE(like_counts.like_count, 0) AS likes,
+                    CASE WHEN user_likes.repository_id IS NOT NULL THEN 1 ELSE 0 END AS is_liked
                 FROM tbl_repository r
                 INNER JOIN tbl_users u ON r.publisher = u.user_id
+                LEFT JOIN (
+                    SELECT repository_id, COUNT(*) as like_count
+                    FROM tbl_repository_likes
+                    GROUP BY repository_id
+                ) like_counts ON r.id = like_counts.repository_id
+                LEFT JOIN (
+                    SELECT repository_id
+                    FROM tbl_repository_likes
+                    WHERE user_id = :current_user_id
+                ) user_likes ON r.id = user_likes.repository_id
                 WHERE r.publisher = :user_id
                 ORDER BY r.created_at DESC";
 
+                $params = [
+                    ':user_id' => (int)$userId,
+                    ':current_user_id' => $currentUserId ? (int)$currentUserId : 0
+                ];
                 $stmt = $this->conn->prepare($sql);
-                $stmt->execute([':user_id' => (int)$userId]);
+                $stmt->execute($params);
             } else {
-                // Get all repositories
+                // Get all repositories (only published)
                 $sql = "SELECT
                     r.*,
                     u.user_name AS publisher_name,
                     u.user_email AS publisher_email,
                     u.user_school AS publisher_school,
-                    u.user_department AS publisher_department
+                    u.user_department AS publisher_department,
+                    COALESCE(r.view_count, 0) AS views,
+                    COALESCE(like_counts.like_count, 0) AS likes,
+                    CASE WHEN user_likes.repository_id IS NOT NULL THEN 1 ELSE 0 END AS is_liked
                 FROM tbl_repository r
                 INNER JOIN tbl_users u ON r.publisher = u.user_id
+                LEFT JOIN (
+                    SELECT repository_id, COUNT(*) as like_count
+                    FROM tbl_repository_likes
+                    GROUP BY repository_id
+                ) like_counts ON r.id = like_counts.repository_id
+                LEFT JOIN (
+                    SELECT repository_id
+                    FROM tbl_repository_likes
+                    WHERE user_id = :current_user_id
+                ) user_likes ON r.id = user_likes.repository_id
+                WHERE r.publishedStatus = 'published'
                 ORDER BY r.created_at DESC";
 
+                $params = [
+                    ':current_user_id' => $currentUserId ? (int)$currentUserId : 0
+                ];
                 $stmt = $this->conn->prepare($sql);
-                $stmt->execute();
+                $stmt->execute($params);
             }
 
             $repositories = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // Format tags as array (category is now single string)
+            // Try to get verification status separately if column exists
+            $verificationMap = [];
+            try {
+                $verifyStmt = $this->conn->prepare("SELECT user_id, COALESCE(is_verified, 0) as is_verified FROM tbl_users");
+                $verifyStmt->execute();
+                $verifications = $verifyStmt->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($verifications as $v) {
+                    $verificationMap[$v['user_id']] = (bool)((int)$v['is_verified']);
+                }
+            } catch (PDOException $e) {
+                // Column doesn't exist, use default false for all
+                error_log("is_verified column may not exist: " . $e->getMessage());
+            }
+
+            // Format tags as array and add stats
             foreach ($repositories as &$repo) {
                 $repo['tags'] = !empty($repo['tags']) ? explode(', ', $repo['tags']) : [];
+                $repo['views'] = (int)($repo['views'] ?? 0);
+                $repo['likes'] = (int)($repo['likes'] ?? 0);
+                $repo['isLiked'] = (bool)((int)($repo['is_liked'] ?? 0));
+                $repo['rating'] = round((float)($repo['rating'] ?? 0), 2);
+                $repo['rating_count'] = (int)($repo['rating_count'] ?? 0);
+                // Get verification status from map or default to false
+                $repo['publisher_is_verified'] = $verificationMap[$repo['publisher']] ?? false;
             }
 
             return json_encode([
@@ -455,6 +512,23 @@ class Publisher {
                 "data" => $repositories
             ]);
         } catch (PDOException $e) {
+            return json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
+        }
+    }
+
+    // Increment view count for a repository
+    public function incrementViewCount($repositoryId) {
+        try {
+            $sql = "UPDATE tbl_repository SET view_count = COALESCE(view_count, 0) + 1 WHERE id = :id";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute([':id' => (int)$repositoryId]);
+
+            return json_encode([
+                "status" => "success",
+                "message" => "View count incremented"
+            ]);
+        } catch (PDOException $e) {
+            error_log("Publisher incrementViewCount PDO Error: " . $e->getMessage());
             return json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
         }
     }
@@ -467,7 +541,8 @@ class Publisher {
                 u.user_name AS publisher_name,
                 u.user_email AS publisher_email,
                 u.user_school AS publisher_school,
-                u.user_department AS publisher_department
+                u.user_department AS publisher_department,
+                COALESCE(r.view_count, 0) AS views
             FROM tbl_repository r
             INNER JOIN tbl_users u ON r.publisher = u.user_id
             WHERE r.id = :id";
@@ -483,6 +558,20 @@ class Publisher {
 
             // Format tags as array (category is now single string)
             $repository['tags'] = !empty($repository['tags']) ? explode(', ', $repository['tags']) : [];
+            $repository['views'] = (int)($repository['views'] ?? 0);
+
+            // Try to get verification status separately if column exists
+            $publisherId = $repository['publisher'];
+            try {
+                $verifyStmt = $this->conn->prepare("SELECT COALESCE(is_verified, 0) as is_verified FROM tbl_users WHERE user_id = :id");
+                $verifyStmt->execute([':id' => (int)$publisherId]);
+                $verifyResult = $verifyStmt->fetch(PDO::FETCH_ASSOC);
+                $repository['publisher_is_verified'] = $verifyResult ? (bool)((int)$verifyResult['is_verified']) : false;
+            } catch (PDOException $e) {
+                // Column doesn't exist, use default false
+                error_log("is_verified column may not exist: " . $e->getMessage());
+                $repository['publisher_is_verified'] = false;
+            }
 
             return json_encode([
                 "status" => "success",
@@ -583,8 +672,9 @@ class Publisher {
                 $pdfUrl = '/uploads/repository/' . $fileName;
             }
 
-            // Prepare category (now single string)
-            $category = trim($data['category']);
+            // Prepare category/department (now single string)
+            // Frontend sends 'department', but database column is 'category'
+            $category = trim($data['department'] ?? $data['category'] ?? '');
 
             // Prepare research type if provided
             $researchType = isset($data['researchType']) ? trim($data['researchType']) : null;
@@ -1418,7 +1508,9 @@ try {
 
         case "get_repositories":
             $userId = $_POST['user_id'] ?? ($jsonData['user_id'] ?? null);
-            echo $publisher->getRepositories($userId);
+            // Get current user ID to check if they liked repositories
+            $currentUserId = $_POST['current_user_id'] ?? ($jsonData['current_user_id'] ?? $_POST['userId'] ?? $jsonData['userId'] ?? null);
+            echo $publisher->getRepositories($userId, $currentUserId);
             break;
 
         case "get_repository":
@@ -1440,15 +1532,15 @@ try {
             echo $publisher->deleteRepository($repositoryId, $userId);
             break;
 
-        case "check_plagiarism":
-            $repositoryId = $jsonData['repository_id'] ?? ($_POST['repository_id'] ?? '');
-            $forceRecheck = isset($jsonData['force_recheck']) ? (bool)$jsonData['force_recheck'] : (isset($_POST['force_recheck']) ? (bool)$_POST['force_recheck'] : false);
-            if (empty($repositoryId)) {
-                echo json_encode(["status" => "error", "message" => "Repository ID is required"]);
-                break;
-            }
-            echo $publisher->checkPlagiarism($repositoryId, $forceRecheck);
-            break;
+        // case "check_plagiarism":
+        //     $repositoryId = $jsonData['repository_id'] ?? ($_POST['repository_id'] ?? '');
+        //     $forceRecheck = isset($jsonData['force_recheck']) ? (bool)$jsonData['force_recheck'] : (isset($_POST['force_recheck']) ? (bool)$_POST['force_recheck'] : false);
+        //     if (empty($repositoryId)) {
+        //         echo json_encode(["status" => "error", "message" => "Repository ID is required"]);
+        //         break;
+        //     }
+        //     echo $publisher->checkPlagiarism($repositoryId, $forceRecheck);
+        //     break;
 
         case "rate_repository":
             $repositoryId = $jsonData['repository_id'] ?? ($_POST['repository_id'] ?? '');
@@ -1522,6 +1614,15 @@ try {
                 break;
             }
             echo $publisher->deleteComment($commentId, $userId);
+            break;
+
+        case "increment_view":
+            $repositoryId = $jsonData['repository_id'] ?? ($_POST['repository_id'] ?? '');
+            if (empty($repositoryId)) {
+                echo json_encode(["status" => "error", "message" => "Repository ID is required"]);
+                break;
+            }
+            echo $publisher->incrementViewCount($repositoryId);
             break;
 
         default:

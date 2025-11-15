@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Bookmark, BookmarkCheck, Download, Eye } from "lucide-react"
+import { Bookmark, BookmarkCheck, Download, Eye, Heart, Star, CheckCircle2 } from "lucide-react"
 
 interface RepositoryCardProps {
   id: string
@@ -12,6 +12,7 @@ interface RepositoryCardProps {
   publisher: {
     name: string
     avatar: string
+    isVerified?: boolean
   }
   category: string[]
   tags: string[]
@@ -21,6 +22,11 @@ interface RepositoryCardProps {
   onViewClick?: () => void
   user?: { name: string; email: string } | null
   detailPath?: string // Optional custom path for detail page link
+  views?: number
+  likes?: number
+  isLiked?: boolean
+  rating?: number
+  ratingCount?: number
 }
 
 export default function RepositoryCard({
@@ -36,9 +42,16 @@ export default function RepositoryCard({
   onViewClick,
   user,
   detailPath,
+  views = 0,
+  likes = 0,
+  isLiked = false,
+  rating = 0,
+  ratingCount = 0,
 }: RepositoryCardProps) {
   const router = useRouter()
   const [isBookmarked, setIsBookmarked] = useState(false)
+  const [isVisible, setIsVisible] = useState(false)
+  const cardRef = useRef<HTMLDivElement>(null)
 
   // Check if repository is saved on mount
   useEffect(() => {
@@ -77,6 +90,34 @@ export default function RepositoryCard({
       }
     }
   }, [id, user])
+
+  // Lazy loading with Intersection Observer
+  useEffect(() => {
+    if (!cardRef.current) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsVisible(true)
+            observer.unobserve(entry.target)
+          }
+        })
+      },
+      {
+        rootMargin: "50px", // Start loading 50px before the card enters viewport
+        threshold: 0.01,
+      }
+    )
+
+    observer.observe(cardRef.current)
+
+    return () => {
+      if (cardRef.current) {
+        observer.unobserve(cardRef.current)
+      }
+    }
+  }, [])
 
   const checkAuth = () => {
     if (!user) {
@@ -150,115 +191,152 @@ export default function RepositoryCard({
 
   return (
     <div
-      className="bg-card border border-border rounded-lg p-6 hover:shadow-lg transition-shadow h-full flex flex-col cursor-pointer"
+      ref={cardRef}
+      className="bg-card border border-border rounded-lg p-6 hover:shadow-lg transition-shadow h-full flex flex-col cursor-pointer relative"
       onClick={handleCardClick}
     >
-      {/* Header with Publisher Info */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3 flex-1">
-          <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center flex-shrink-0">
-            <span className="text-accent-foreground font-bold text-sm">{publisher.avatar}</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-foreground text-sm truncate">{publisher.name}</p>
-            <p className="text-xs text-muted-foreground">{publishedDate || "Not published"}</p>
-          </div>
+      {!isVisible ? (
+        <div className="absolute inset-0 bg-muted/50 animate-pulse rounded-lg flex items-center justify-center">
+          <div className="text-muted-foreground text-sm">Loading...</div>
         </div>
-        <div className="flex-shrink-0">
-          <span
-            className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-              publishedStatus === "published"
-                ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-                : publishedStatus === "pending"
-                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
-                : publishedStatus === "rejected"
-                ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
-                : publishedStatus === "unpublished"
-                ? "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300"
-                : "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300"
-            }`}
-          >
-            {publishedStatus === "published"
-              ? "Published"
-              : publishedStatus === "pending"
-              ? "Pending"
-              : publishedStatus === "rejected"
-              ? "Rejected"
-              : publishedStatus === "unpublished"
-              ? "Unpublished"
-              : "Draft"}
-          </span>
-        </div>
-      </div>
-
-      {/* Title and Abstract */}
-      <div className="flex-1 mb-4">
-        <h3 className="text-lg font-bold text-foreground mb-2 line-clamp-2 hover:text-accent transition-colors">
-          {title}
-        </h3>
-        <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">{abstract}</p>
-      </div>
-
-      {/* Category and Tags */}
-      <div className="mb-4">
-        <div className="flex flex-wrap gap-2">
-          {category.map((cat) => (
+      ) : null}
+      <div className={isVisible ? "opacity-100 transition-opacity duration-300 flex flex-col h-full" : "opacity-0 flex flex-col h-full"}>
+        {/* Header with Publisher Info */}
+        <div className="flex items-start justify-between mb-4 flex-shrink-0">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center flex-shrink-0">
+              <span className="text-accent-foreground font-bold text-sm">{publisher.avatar}</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <p className="font-semibold text-foreground text-sm truncate">{publisher.name}</p>
+                {publisher.isVerified && (
+                  <CheckCircle2 size={14} className="text-primary flex-shrink-0" title="Verified user" />
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">{publishedDate || "Not published"}</p>
+            </div>
+          </div>
+          <div className="flex-shrink-0">
             <span
-              key={cat}
-              className="inline-block px-2.5 py-1 bg-secondary/20 text-secondary text-xs rounded font-medium"
+              className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                publishedStatus === "published"
+                  ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                  : publishedStatus === "pending"
+                  ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
+                  : publishedStatus === "rejected"
+                  ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
+                  : publishedStatus === "unpublished"
+                  ? "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300"
+                  : "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300"
+              }`}
             >
-              {cat}
+              {publishedStatus === "published"
+                ? "Published"
+                : publishedStatus === "pending"
+                ? "Pending"
+                : publishedStatus === "rejected"
+                ? "Rejected"
+                : publishedStatus === "unpublished"
+                ? "Unpublished"
+                : "Draft"}
             </span>
-          ))}
-          {tags.map((tag) => (
-            <span key={tag} className="inline-block px-2.5 py-1 bg-muted text-muted-foreground text-xs rounded">
-              #{tag}
-            </span>
-          ))}
+          </div>
         </div>
-      </div>
 
-      {/* Actions */}
-      <div className="flex gap-2 pt-4 border-t border-border" onClick={(e) => e.stopPropagation()}>
-        <Button
-          variant="outline"
-          size="sm"
-          className="flex-1 gap-2 bg-transparent"
-          onClick={handleView}
-          aria-label="View repository"
-        >
-          <Eye size={16} />
-          <span className="hidden sm:inline">View</span>
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="flex-1 gap-2 bg-transparent"
-          onClick={handleDownload}
-          aria-label="Download PDF"
-        >
-          <Download size={16} />
-          <span className="hidden sm:inline">Download</span>
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="flex-1 gap-2 bg-transparent"
-          onClick={handleBookmark}
-          aria-label={isBookmarked ? "Remove bookmark" : "Add bookmark"}
-        >
-          {isBookmarked ? (
-            <>
-              <BookmarkCheck size={16} />
-              <span className="hidden sm:inline">Saved</span>
-            </>
-          ) : (
-            <>
-              <Bookmark size={16} />
-              <span className="hidden sm:inline">Save</span>
-            </>
+        {/* Title and Abstract */}
+        <div className="flex-1 mb-4 min-h-0">
+          <h3 className="text-lg font-bold text-foreground mb-2 line-clamp-2 hover:text-accent transition-colors">
+            {title}
+          </h3>
+          <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">{abstract}</p>
+        </div>
+
+        {/* Category and Keywords */}
+        <div className="mb-4 flex-shrink-0">
+          <div className="flex flex-wrap gap-2">
+            {category.map((cat) => (
+              <span
+                key={cat}
+                className="inline-block px-2.5 py-1 bg-secondary/20 text-secondary text-xs rounded font-medium"
+              >
+                {cat}
+              </span>
+            ))}
+            {tags.slice(0, 3).map((keyword) => (
+              <span key={keyword} className="inline-block px-2.5 py-1 bg-muted text-muted-foreground text-xs rounded">
+                #{keyword}
+              </span>
+            ))}
+            {tags.length > 3 && (
+              <span className="inline-block px-2.5 py-1 bg-muted text-muted-foreground text-xs rounded">
+                +{tags.length - 3} more
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Stats: Views, Likes, Rating */}
+        <div className="flex items-center gap-4 mb-4 text-xs text-muted-foreground flex-shrink-0">
+          <div className="flex items-center gap-1">
+            <Eye size={14} />
+            <span>{views.toLocaleString()}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Heart size={14} className={isLiked ? "fill-primary text-primary" : ""} />
+            <span>{likes.toLocaleString()}</span>
+          </div>
+          {rating > 0 && (
+            <div className="flex items-center gap-1">
+              <Star size={14} className="fill-yellow-400 text-yellow-400" />
+              <span className="font-medium">{rating.toFixed(1)}</span>
+              {ratingCount > 0 && <span className="text-muted-foreground/70">({ratingCount})</span>}
+            </div>
           )}
-        </Button>
+        </div>
+
+        {/* Actions - Always at bottom */}
+        <div className="flex gap-2 pt-4 border-t border-border mt-auto flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 gap-2 bg-transparent"
+            onClick={handleView}
+            aria-label="View repository"
+          >
+            <Eye size={16} />
+            <span className="hidden sm:inline">View</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 gap-2 bg-transparent"
+            onClick={handleDownload}
+            aria-label="Download PDF"
+          >
+            <Download size={16} />
+            <span className="hidden sm:inline">Download</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 gap-2 bg-transparent"
+            onClick={handleBookmark}
+            aria-label={isBookmarked ? "Remove bookmark" : "Add bookmark"}
+          >
+            {isBookmarked ? (
+              <>
+                <BookmarkCheck size={16} />
+                <span className="hidden sm:inline">Saved</span>
+              </>
+            ) : (
+              <>
+                <Bookmark size={16} />
+                <span className="hidden sm:inline">Save</span>
+              </>
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   )

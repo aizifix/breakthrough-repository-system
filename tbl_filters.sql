@@ -36,12 +36,12 @@ CREATE TABLE IF NOT EXISTS tbl_category (
 
 -- Insert default departments
 INSERT INTO tbl_department (name, description) VALUES
-('Computer Science', 'Computer Science and Information Technology'),
-('Engineering', 'Engineering disciplines'),
-('Biology', 'Biological Sciences'),
-('Chemistry', 'Chemical Sciences'),
-('Physics', 'Physical Sciences'),
-('Mathematics', 'Mathematical Sciences')
+('College of Management and Accountancy', 'College of Management and Accountancy'),
+('College of Engineering and Architecture', 'College of Engineering and Architecture'),
+('College of Education', 'College of Education'),
+('School of Criminology and Criminal Justice', 'School of Criminology and Criminal Justice'),
+('College of Information Technology', 'College of Information Technology'),
+('College of Allied Health and Sciences', 'College of Allied Health and Sciences')
 ON DUPLICATE KEY UPDATE name=name;
 
 -- Insert default research types

@@ -26,8 +26,9 @@ export default function AuthenticatedLayout({
           const userData = JSON.parse(stored)
           setUser(userData)
         } else {
-          // No user found, redirect to login
-          router.push("/auth/login")
+          // No user found, redirect to login and prevent back navigation
+          window.history.replaceState(null, "", "/auth/login")
+          router.replace("/auth/login")
         }
         setIsLoading(false)
       }
@@ -37,13 +38,29 @@ export default function AuthenticatedLayout({
       // Listen for storage changes
       const handleStorageChange = (e: StorageEvent) => {
         if (e.key === "user") {
-          loadUser()
+          const stored = localStorage.getItem("user")
+          if (!stored) {
+            // User logged out, redirect to home and prevent back navigation
+            window.history.replaceState(null, "", "/")
+            router.replace("/")
+            setUser(null)
+          } else {
+            loadUser()
+          }
         }
       }
 
       // Listen for custom logout event
       const handleLogout = () => {
-        loadUser()
+        const stored = localStorage.getItem("user")
+        if (!stored) {
+          // User logged out, redirect to home and prevent back navigation
+          window.history.replaceState(null, "", "/")
+          router.replace("/")
+          setUser(null)
+        } else {
+          loadUser()
+        }
       }
 
       window.addEventListener("storage", handleStorageChange)

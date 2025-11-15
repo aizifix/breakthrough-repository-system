@@ -22,14 +22,17 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { User, Mail, Building2, Briefcase, FileText, User as PhoneIcon, Mail as MapIcon, Download, FileText as Edit2, ArrowLeft } from "lucide-react"
+import { User, Mail, Building2, Briefcase, FileText, User as PhoneIcon, Mail as MapIcon, Download, FileText as Edit2, ArrowLeft, Fingerprint } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { getUserProfile } from "@/app/config/api"
 
 interface UserProfile {
   name: string
   email: string
   avatar?: string
   role?: string
+  userId?: number
+  uniqueId?: string
   // Extended profile fields
   institution?: string
   department?: string
@@ -53,6 +56,7 @@ export default function ProfilePage() {
   const [formData, setFormData] = useState<UserProfile>({
     name: "",
     email: "",
+    uniqueId: "",
     institution: "",
     department: "",
     position: "",
@@ -64,30 +68,102 @@ export default function ProfilePage() {
     keywords: "",
   })
 
-  // Load user and profile data from localStorage
+  // Load user and profile data from API
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("user")
-      if (stored) {
-        const userData = JSON.parse(stored)
-        setUser(userData)
+    const loadProfile = async () => {
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem("user")
+        if (stored) {
+          try {
+            const userData = JSON.parse(stored)
+            setUser(userData)
 
-        // Load extended profile data
-        const storedProfile = localStorage.getItem(`userProfile_${userData.email}`)
-        const profileData = storedProfile ? JSON.parse(storedProfile) : {}
+            // Fetch full profile from API
+            const userId = userData.userId || userData.user_id
+            if (userId) {
+              try {
+                const response = await getUserProfile(userId)
+                if (response.status === "success" && response.user) {
+                  const apiUser = response.user
 
-        // Merge user data with profile data
-        const mergedProfile: UserProfile = {
-          ...userData,
-          ...profileData,
+                  // Map API data to profile format
+                  const apiProfile: UserProfile = {
+                    name: apiUser.user_name || userData.name,
+                    email: apiUser.user_email || userData.email,
+                    avatar: userData.avatar,
+                    role: apiUser.user_role || userData.role,
+                    userId: apiUser.user_id,
+                    uniqueId: apiUser.user_unique_id || userData.uniqueId,
+                    institution: apiUser.user_school || "",
+                    department: apiUser.user_department || "",
+                    position: apiUser.user_type || "",
+                    contactNumber: apiUser.user_contact || "",
+                    address: apiUser.user_address || "",
+                    // These fields might not be in the database yet, so check localStorage
+                    biography: "",
+                    researchType: "",
+                    researchArea: "",
+                    keywords: "",
+                  }
+
+                  // Load extended profile data from localStorage (for fields not in DB)
+                  const storedProfile = localStorage.getItem(`userProfile_${userData.email}`)
+                  if (storedProfile) {
+                    const profileData = JSON.parse(storedProfile)
+                    apiProfile.biography = profileData.biography || ""
+                    apiProfile.researchType = profileData.researchType || ""
+                    apiProfile.researchArea = profileData.researchArea || ""
+                    apiProfile.keywords = profileData.keywords || ""
+                  }
+
+                  setProfile(apiProfile)
+                  setFormData(apiProfile)
+                } else {
+                  // Fallback to localStorage if API fails
+                  const storedProfile = localStorage.getItem(`userProfile_${userData.email}`)
+                  const profileData = storedProfile ? JSON.parse(storedProfile) : {}
+                  const mergedProfile: UserProfile = {
+                    ...userData,
+                    ...profileData,
+                  }
+                  setProfile(mergedProfile)
+                  setFormData(mergedProfile)
+                }
+              } catch (error) {
+                console.error("Error fetching profile:", error)
+                // Fallback to localStorage if API fails
+                const storedProfile = localStorage.getItem(`userProfile_${userData.email}`)
+                const profileData = storedProfile ? JSON.parse(storedProfile) : {}
+                const mergedProfile: UserProfile = {
+                  ...userData,
+                  ...profileData,
+                }
+                setProfile(mergedProfile)
+                setFormData(mergedProfile)
+              }
+            } else {
+              // No userId, use localStorage only
+              const storedProfile = localStorage.getItem(`userProfile_${userData.email}`)
+              const profileData = storedProfile ? JSON.parse(storedProfile) : {}
+              const mergedProfile: UserProfile = {
+                ...userData,
+                ...profileData,
+              }
+              setProfile(mergedProfile)
+              setFormData(mergedProfile)
+            }
+          } catch (error) {
+            console.error("Error parsing user data:", error)
+            router.push("/auth/login")
+          }
+        } else {
+          router.push("/auth/login")
         }
-        setProfile(mergedProfile)
-        setFormData(mergedProfile)
-      } else {
-        router.push("/auth/login")
+        setIsLoading(false)
       }
-      setIsLoading(false)
     }
+
+    loadProfile()
   }, [router])
 
   const handleInputChange = (field: keyof UserProfile, value: string) => {
@@ -103,6 +179,8 @@ export default function ProfilePage() {
         email: formData.email,
         avatar: formData.avatar || user?.avatar,
         role: formData.role || user?.role,
+        userId: user?.userId,
+        uniqueId: user?.uniqueId || formData.uniqueId,
       }
 
       // Save extended profile data separately
@@ -210,11 +288,11 @@ export default function ProfilePage() {
         <div className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-2">
-                <User size={32} className="text-primary" />
+              <h1 className="text-2xl font-bold text-foreground mb-2 flex items-center gap-2">
+                <User size={24} className="text-primary" />
                 Profile
               </h1>
-              <p className="text-muted-foreground">View and manage your profile information</p>
+              <p className="text-sm text-muted-foreground">View and manage your profile information</p>
             </div>
             {!isEditing && (
               <Button
@@ -271,6 +349,16 @@ export default function ProfilePage() {
                 ) : (
                   <p className="text-foreground">{profile.email}</p>
                 )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="uniqueId" className="text-foreground font-medium flex items-center gap-2">
+                  <Fingerprint size={16} />
+                  Breakthrough ID (BT-ID):
+                </Label>
+                <div className="px-4 py-2 bg-primary/10 border border-primary/20 rounded-md">
+                  <p className="text-foreground font-mono font-semibold text-base">{profile.uniqueId || "Not assigned"}</p>
+                </div>
+                <p className="text-xs text-muted-foreground">This is your unique identifier. Please save this for future reference.</p>
               </div>
             </div>
           </div>
