@@ -12,6 +12,9 @@ CREATE TABLE tbl_users (
     user_type VARCHAR(100),                  -- User type
     user_contact VARCHAR(50),                -- User's contact number
     user_address TEXT,                       -- User's address
+    user_unique_id VARCHAR(50),              -- System-generated unique ID
+    student_id_number VARCHAR(100),          -- Student ID number
+    student_id_image VARCHAR(255),           -- Stored path to student ID image
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Record creation timestamp
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP -- Record update timestamp
 );

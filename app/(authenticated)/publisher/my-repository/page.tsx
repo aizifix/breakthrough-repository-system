@@ -18,6 +18,7 @@ interface Repository {
     name: string
     avatar: string
   }
+  publisherId?: number // Publisher ID for ownership checks
   category: string[]
   keywords: string[]
   publishedDate: string | null
@@ -66,29 +67,30 @@ export default function MyRepositoriesPage() {
                  const response = await getPublisherRepositories(userId, userId)
 
                  if (response.status === "success" && response.data) {
-                   // Format repositories to match expected structure
-                   const formattedRepos = response.data.map((repo: any) => ({
-                     ...repo,
-                     id: repo.id.toString(), // Ensure id is string for RepositoryCard
-                     publisher: {
-                       name: repo.publisher_name || "Unknown",
-                       avatar: (repo.publisher_name || "U")
-                         .split(" ")
-                         .map((n: string) => n[0])
-                         .join("")
-                         .toUpperCase()
-                         .slice(0, 2),
-                       isVerified: repo.publisher_is_verified ?? false,
-                     },
-                     // Ensure category and keywords are arrays
-                     category: Array.isArray(repo.category) ? repo.category : (repo.category ? [repo.category] : []),
-                     keywords: Array.isArray(repo.tags) ? repo.tags : (repo.tags ? [repo.tags] : []),
-                     views: repo.views ?? 0,
-                     likes: repo.likes ?? 0,
-                     isLiked: repo.isLiked ?? false,
-                     rating: repo.rating ?? 0,
-                     ratingCount: repo.rating_count ?? 0,
-                   }))
+                  // Format repositories to match expected structure
+                  const formattedRepos = response.data.map((repo: any) => ({
+                    ...repo,
+                    id: repo.id.toString(), // Ensure id is string for RepositoryCard
+                    publisherId: repo.publisher, // Preserve original publisher ID
+                    publisher: {
+                      name: repo.publisher_name || "Unknown",
+                      avatar: (repo.publisher_name || "U")
+                        .split(" ")
+                        .map((n: string) => n[0])
+                        .join("")
+                        .toUpperCase()
+                        .slice(0, 2),
+                      isVerified: repo.publisher_is_verified ?? false,
+                    },
+                    // Ensure category and keywords are arrays
+                    category: Array.isArray(repo.category) ? repo.category : (repo.category ? [repo.category] : []),
+                    keywords: Array.isArray(repo.tags) ? repo.tags : (repo.tags ? [repo.tags] : []),
+                    views: repo.views ?? 0,
+                    likes: repo.likes ?? 0,
+                    isLiked: repo.isLiked ?? false,
+                    rating: repo.rating ?? 0,
+                    ratingCount: repo.rating_count ?? 0,
+                  }))
                    setRepositories(formattedRepos)
                  } else {
                    setRepositories([])
@@ -129,28 +131,29 @@ export default function MyRepositoriesPage() {
          const response = await getPublisherRepositories(userId)
 
          if (response.status === "success" && response.data) {
-           const formattedRepos = response.data.map((repo: any) => ({
-             ...repo,
-             id: repo.id.toString(), // Ensure id is string for RepositoryCard
-             publisher: {
-               name: repo.publisher_name || "Unknown",
-               avatar: (repo.publisher_name || "U")
-                 .split(" ")
-                 .map((n: string) => n[0])
-                 .join("")
-                 .toUpperCase()
-                 .slice(0, 2),
-               isVerified: repo.publisher_is_verified ?? false,
-             },
-             // Ensure category and keywords are arrays
-             category: Array.isArray(repo.category) ? repo.category : (repo.category ? [repo.category] : []),
-             keywords: Array.isArray(repo.tags) ? repo.tags : (repo.tags ? [repo.tags] : []),
-             views: repo.views ?? 0,
-             likes: repo.likes ?? 0,
-             isLiked: repo.isLiked ?? false,
-             rating: repo.rating ?? 0,
-             ratingCount: repo.rating_count ?? 0,
-           }))
+          const formattedRepos = response.data.map((repo: any) => ({
+            ...repo,
+            id: repo.id.toString(), // Ensure id is string for RepositoryCard
+            publisherId: repo.publisher, // Preserve original publisher ID
+            publisher: {
+              name: repo.publisher_name || "Unknown",
+              avatar: (repo.publisher_name || "U")
+                .split(" ")
+                .map((n: string) => n[0])
+                .join("")
+                .toUpperCase()
+                .slice(0, 2),
+              isVerified: repo.publisher_is_verified ?? false,
+            },
+            // Ensure category and keywords are arrays
+            category: Array.isArray(repo.category) ? repo.category : (repo.category ? [repo.category] : []),
+            keywords: Array.isArray(repo.tags) ? repo.tags : (repo.tags ? [repo.tags] : []),
+            views: repo.views ?? 0,
+            likes: repo.likes ?? 0,
+            isLiked: repo.isLiked ?? false,
+            rating: repo.rating ?? 0,
+            ratingCount: repo.rating_count ?? 0,
+          }))
            setRepositories(formattedRepos)
          } else {
            setRepositories([])
@@ -319,6 +322,7 @@ export default function MyRepositoriesPage() {
                       rating={repo.rating}
                       ratingCount={repo.ratingCount}
                       user={user}
+                      publisherId={repo.publisherId as number}
                       detailPath="/publisher/my-repository"
                       onViewClick={() => {
                         setSelectedRepository(repo)

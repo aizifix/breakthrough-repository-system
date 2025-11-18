@@ -19,6 +19,10 @@ declare module 'lucide-react' {
   export const Building2: FC<IconProps>
   export const Briefcase: FC<IconProps>
   export const FileText: FC<IconProps>
+  export const Phone: FC<IconProps>
+  export const MapPin: FC<IconProps>
+  export const Edit2: FC<IconProps>
+  export const Fingerprint: FC<IconProps>
   export const Shield: FC<IconProps>
   export const Plus: FC<IconProps>
   export const X: FC<IconProps>
@@ -34,6 +38,9 @@ declare module 'lucide-react' {
   export const BookmarkCheck: FC<IconProps>
   export const Eye: FC<IconProps>
   export const Trash2: FC<IconProps>
+  export const CreditCard: FC<IconProps>
+  export const Image: FC<IconProps>
+  export const MoreVertical: FC<IconProps>
 
   // Type for any icon component
   type LucideIcon = FC<IconProps>

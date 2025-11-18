@@ -72,6 +72,8 @@ export interface RegisterData {
   user_contact?: string;
   user_address?: string;
   captcha?: string;
+  student_id_number?: string;
+  student_id_image?: string;
 }
 
 export interface LoginData {
@@ -90,6 +92,8 @@ export interface User {
   user_contact?: string;
   user_address?: string;
   user_unique_id?: string;
+  student_id_number?: string;
+  student_id_image?: string;
 }
 
 // ============================================

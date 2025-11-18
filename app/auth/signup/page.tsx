@@ -43,6 +43,8 @@ export default function SignupPage() {
     institution: "",
     department: "",
     position: "",
+    studentIdNumber: "",
+    studentIdImage: "",
     // Contact Info
     contactNumber: "",
     // Address Info
@@ -161,7 +163,7 @@ export default function SignupPage() {
         return true
 
       case 2: // Institution Info
-        if (!formData.institution || !formData.department || !formData.position) {
+        if (!formData.institution || !formData.department || !formData.position || !formData.studentIdNumber || !formData.studentIdImage) {
           setError("Please fill in all required fields")
           return false
         }
@@ -236,6 +238,8 @@ export default function SignupPage() {
         user_contact: formData.contactNumber || "",
         user_address: fullAddress,
         captcha: captchaAnswer,
+        student_id_number: formData.studentIdNumber,
+        student_id_image: formData.studentIdImage,
       })
 
       if (result.status === "success") {
@@ -256,6 +260,8 @@ export default function SignupPage() {
           position: formData.position,
           contactNumber: formData.contactNumber,
           address: fullAddress,
+          studentIdNumber: formData.studentIdNumber,
+          studentIdImage: formData.studentIdImage,
         }
 
         localStorage.setItem("user", JSON.stringify(user))
@@ -639,6 +645,125 @@ export default function SignupPage() {
                   </div>
                   <p className="text-xs text-muted-foreground">Philippines (+63) - 10 digits</p>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="studentIdNumber" className="text-foreground font-medium">
+                    Student ID Number <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="studentIdNumber"
+                    type="text"
+                    placeholder="e.g., 2021-12345"
+                    value={formData.studentIdNumber}
+                    onChange={(e) => setFormData({ ...formData, studentIdNumber: e.target.value })}
+                    className="bg-input border-border"
+                    disabled={isLoading}
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <Label htmlFor="studentIdImage" className="text-foreground font-medium">
+                    Student ID Photo <span className="text-destructive">*</span>
+                  </Label>
+                  {formData.studentIdImage ? (
+                    <div className="rounded-lg border border-border bg-muted/30 p-4 flex flex-col gap-4">
+                      <div className="w-full overflow-hidden rounded-md border border-border bg-background">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={formData.studentIdImage}
+                          alt="Student ID preview"
+                          className="w-full h-48 object-contain bg-background"
+                        />
+                      </div>
+                      <div className="flex gap-3">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="bg-transparent border-border"
+                          onClick={() => {
+                            setFormData({ ...formData, studentIdImage: "" })
+                          }}
+                          disabled={isLoading}
+                        >
+                          Remove Photo
+                        </Button>
+                        <label className="flex-1">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null
+                              if (!file) {
+                                setFormData({ ...formData, studentIdImage: "" })
+                                return
+                              }
+                              if (!file.type.startsWith("image/")) {
+                                setError("Please upload a valid image file for your student ID.")
+                                return
+                              }
+                              const maxSizeMB = 5
+                              if (file.size > maxSizeMB * 1024 * 1024) {
+                                setError(`Image size should not exceed ${maxSizeMB}MB.`)
+                                return
+                              }
+                              const reader = new FileReader()
+                              reader.onloadend = () => {
+                                setFormData({ ...formData, studentIdImage: reader.result as string })
+                              }
+                              reader.readAsDataURL(file)
+                            }}
+                            disabled={isLoading}
+                          />
+                          <span className="inline-flex h-10 w-full items-center justify-center rounded-md border border-border bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer">
+                            Replace Photo
+                          </span>
+                        </label>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Please upload a clear photo of the front side of your valid student ID. Supported formats: JPG, PNG. Max size 5MB.
+                      </p>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-border rounded-lg cursor-pointer bg-muted/30 hover:bg-muted/50 transition-colors">
+                      <input
+                        id="studentIdImage"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null
+                          if (!file) {
+                            setFormData({ ...formData, studentIdImage: "" })
+                            return
+                          }
+                          if (!file.type.startsWith("image/")) {
+                            setError("Please upload a valid image file for your student ID.")
+                            return
+                          }
+                          const maxSizeMB = 5
+                          if (file.size > maxSizeMB * 1024 * 1024) {
+                            setError(`Image size should not exceed ${maxSizeMB}MB.`)
+                            return
+                          }
+                          const reader = new FileReader()
+                          reader.onloadend = () => {
+                            setFormData({ ...formData, studentIdImage: reader.result as string })
+                          }
+                          reader.readAsDataURL(file)
+                        }}
+                        disabled={isLoading}
+                      />
+                      <div className="flex flex-col items-center gap-2 text-center">
+                        <Building2 className="w-8 h-8 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Upload Student ID</p>
+                          <p className="text-xs text-muted-foreground">JPG or PNG (max 5MB)</p>
+                        </div>
+                      </div>
+                    </label>
+                  )}
+                </div>
               </div>
             )}
 
@@ -761,6 +886,25 @@ export default function SignupPage() {
                         <span className="text-foreground font-medium">{formData.contactNumber}</span>
                       </div>
                     )}
+                    <div>
+                      <span className="text-muted-foreground">Student ID No.:</span>{" "}
+                      <span className="text-foreground font-medium">{formData.studentIdNumber}</span>
+                    </div>
+                    <div className="space-y-2">
+                      <span className="text-muted-foreground block">Student ID Photo:</span>
+                      {formData.studentIdImage ? (
+                        <div className="rounded-md border border-border bg-background p-2 w-full md:w-1/2">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={formData.studentIdImage}
+                            alt="Student ID preview"
+                            className="w-full h-40 object-contain"
+                          />
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No photo uploaded</p>
+                      )}
+                    </div>
                     <div>
                       <span className="text-muted-foreground">Address:</span>{" "}
                       <span className="text-foreground font-medium">

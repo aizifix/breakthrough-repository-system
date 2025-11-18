@@ -40,6 +40,11 @@ import {
   MoreVertical,
   CheckCircle2,
   XCircle,
+  CreditCard,
+  Image as ImageIcon,
+  Phone,
+  MapPin,
+  Fingerprint,
 } from "lucide-react"
 import {
   Dialog,
@@ -69,6 +74,11 @@ interface User {
   institution?: string | null
   department?: string | null
   position?: string | null
+  contact?: string | null
+  address?: string | null
+  uniqueId?: string | null
+  studentIdNumber?: string | null
+  studentIdImage?: string | null
   createdAt: string
   lastLogin?: string
   status: "active" | "inactive" | "suspended"
@@ -85,6 +95,8 @@ export default function UsersPage() {
   const [roleFilter, setRoleFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+  const [viewingUser, setViewingUser] = useState<User | null>(null)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [formData, setFormData] = useState({
     name: "",
@@ -135,6 +147,11 @@ export default function UsersPage() {
           institution: user.institution || null,
           department: user.department || null,
           position: user.position || null,
+          contact: user.contact || null,
+          address: user.address || null,
+          uniqueId: user.uniqueId || null,
+          studentIdNumber: user.studentIdNumber || null,
+          studentIdImage: user.studentIdImage || null,
           createdAt: user.createdAt,
           status: user.status || "active",
           repositoriesCount: user.repositoriesCount || 0,
@@ -513,7 +530,14 @@ export default function UsersPage() {
                   </TableHeader>
                 <TableBody>
                   {filteredUsers.map((userItem) => (
-                    <TableRow key={userItem.id}>
+                    <TableRow
+                      key={userItem.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => {
+                        setViewingUser(userItem)
+                        setIsDetailsModalOpen(true)
+                      }}
+                    >
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center text-accent-foreground text-sm font-semibold shrink-0">
@@ -529,7 +553,7 @@ export default function UsersPage() {
                             <div className="font-medium truncate flex items-center gap-2">
                               {userItem.name}
                               {userItem.isVerified && (
-                                <CheckCircle2 size={16} className="text-primary shrink-0" title="Verified" />
+                                <CheckCircle2 size={16} className="text-primary shrink-0" />
                               )}
                             </div>
                             <div className="text-sm text-muted-foreground flex items-center gap-1 truncate">
@@ -576,7 +600,10 @@ export default function UsersPage() {
                           {formatDate(userItem.createdAt)}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right sticky right-0 bg-card z-10 border-l border-border">
+                      <TableCell
+                        className="text-right sticky right-0 bg-card z-10 border-l border-border"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -789,6 +816,226 @@ export default function UsersPage() {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* User Details Modal */}
+        <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
+          <DialogContent className="max-w-4xl h-[90vh] !grid-none flex flex-col p-0" style={{ display: 'flex' }}>
+            {/* Sticky Header */}
+            <DialogHeader className="sticky top-0 z-10 bg-background border-b border-border px-6 pt-6 pb-4 shrink-0">
+              <DialogTitle className="flex items-center gap-2">
+                <UserIcon size={20} />
+                User Details
+              </DialogTitle>
+              <DialogDescription>
+                Complete user information and verification credentials
+              </DialogDescription>
+            </DialogHeader>
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto px-6 min-h-0">
+              {viewingUser && (
+                <div className="space-y-6 py-4">
+                {/* Basic Information */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                    <UserIcon size={18} />
+                    Basic Information
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-muted-foreground">Full Name</Label>
+                      <p className="text-foreground">{viewingUser.name}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <Mail size={14} />
+                        Email Address
+                      </Label>
+                      <p className="text-foreground">{viewingUser.email}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <Fingerprint size={14} />
+                        Unique ID
+                      </Label>
+                      <p className="text-foreground font-mono">{viewingUser.uniqueId || "Not assigned"}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-muted-foreground">Role</Label>
+                      <Badge variant={viewingUser.role === "admin" ? "default" : "secondary"}>
+                        {viewingUser.role === "admin" ? (
+                          <span className="flex items-center gap-1">
+                            <Shield size={12} />
+                            Admin
+                          </span>
+                        ) : (
+                          "Publisher"
+                        )}
+                      </Badge>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-muted-foreground">Verification Status</Label>
+                      <div>
+                        {viewingUser.isVerified ? (
+                          <Badge className="bg-green-600 hover:bg-green-700 text-white">
+                            <CheckCircle2 size={14} />
+                            Verified
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white">
+                            <XCircle size={14} />
+                            Not Verified
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-muted-foreground">Repositories</Label>
+                      <p className="text-foreground">{viewingUser.repositoriesCount || 0}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Institution Information */}
+                <div className="space-y-4 pt-4 border-t border-border">
+                  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                    <Building2 size={18} />
+                    Institution Information
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-muted-foreground">Institution</Label>
+                      <p className="text-foreground">{viewingUser.institution || "Not provided"}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-muted-foreground">Department</Label>
+                      <p className="text-foreground">{viewingUser.department || "Not provided"}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-muted-foreground">Position</Label>
+                      <p className="text-foreground">{viewingUser.position || "Not provided"}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contact Information */}
+                <div className="space-y-4 pt-4 border-t border-border">
+                  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                    <Phone size={18} />
+                    Contact Information
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <Phone size={14} />
+                        Contact Number
+                      </Label>
+                      <p className="text-foreground">{viewingUser.contact || "Not provided"}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <MapPin size={14} />
+                        Address
+                      </Label>
+                      <p className="text-foreground">{viewingUser.address || "Not provided"}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Student ID Information */}
+                <div className="space-y-4 pt-4 border-t border-border">
+                  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                    <CreditCard size={18} />
+                    Student ID Information
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <CreditCard size={14} />
+                        Student ID Number
+                      </Label>
+                      <div className="px-4 py-2 bg-muted/50 border border-border rounded-md">
+                        <p className="text-foreground font-mono">{viewingUser.studentIdNumber || "Not provided"}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <ImageIcon size={14} />
+                        Student ID Photo
+                      </Label>
+                      {viewingUser.studentIdImage ? (
+                        <div className="rounded-lg border border-border bg-muted/30 p-4">
+                          <div className="w-full overflow-hidden rounded-md border border-border bg-background">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={`http://localhost/repository-api/${viewingUser.studentIdImage}`}
+                              alt="Student ID"
+                              className="w-full h-64 object-contain bg-background"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement
+                                target.style.display = 'none'
+                                const parent = target.parentElement
+                                if (parent) {
+                                  parent.innerHTML = '<p class="text-muted-foreground text-sm p-4 text-center">Image not found</p>'
+                                }
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="px-4 py-8 bg-muted/50 border border-border rounded-md text-center">
+                          <p className="text-muted-foreground">No student ID photo uploaded</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Account Information */}
+                <div className="space-y-4 pt-4 border-t border-border">
+                  <h3 className="text-lg font-semibold text-foreground">Account Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-muted-foreground">Joined Date</Label>
+                      <p className="text-foreground">{formatDate(viewingUser.createdAt)}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-muted-foreground">Status</Label>
+                      <Badge variant={getStatusBadgeVariant(viewingUser.status)}>
+                        {viewingUser.status.charAt(0).toUpperCase() + viewingUser.status.slice(1)}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+                </div>
+              )}
+            </div>
+            {/* Sticky Footer */}
+            <div className="bg-background border-t border-border px-6 py-4 shrink-0">
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDetailsModalOpen(false)}
+                >
+                  Close
+                </Button>
+                {viewingUser && !viewingUser.isVerified && (
+                  <Button
+                    type="button"
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={async () => {
+                      await handleVerify(viewingUser.id, true)
+                      setIsDetailsModalOpen(false)
+                    }}
+                  >
+                    <CheckCircle2 size={16} className="mr-2" />
+                    Verify User
+                  </Button>
+                )}
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

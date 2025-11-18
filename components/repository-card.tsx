@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Bookmark, BookmarkCheck, Download, Eye, Heart, Star, CheckCircle2 } from "lucide-react"
+import { Bookmark, BookmarkCheck, Download, Eye, Heart, Star, CheckCircle2, Edit2, Trash2 } from "lucide-react"
 
 interface RepositoryCardProps {
   id: string
@@ -20,8 +20,9 @@ interface RepositoryCardProps {
   publishedStatus: "published" | "draft" | "unpublished" | "pending" | "rejected"
   pdfUrl?: string
   onViewClick?: () => void
-  user?: { name: string; email: string } | null
+  user?: { name: string; email: string; userId?: number; user_id?: number } | null
   detailPath?: string // Optional custom path for detail page link
+  publisherId?: number // Publisher ID to check if user owns the repository
   views?: number
   likes?: number
   isLiked?: boolean
@@ -42,6 +43,7 @@ export default function RepositoryCard({
   onViewClick,
   user,
   detailPath,
+  publisherId,
   views = 0,
   likes = 0,
   isLiked = false,
@@ -150,6 +152,62 @@ export default function RepositoryCard({
   const handleCardClick = () => {
     const path = detailPath ? `${detailPath}/${id}` : `/research/${id}`
     router.push(path)
+  }
+
+  // Check if user owns this repository
+  const userId = user ? ((user as any).userId || (user as any).user_id) : null
+  const isOwner = userId && publisherId && userId === publisherId
+  // Check if repository can be edited/deleted (only pending or unpublished)
+  const canEditOrDelete = isOwner && ["pending", "unpublished"].includes(publishedStatus)
+
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!checkAuth() || !canEditOrDelete) return
+    const path = detailPath ? `${detailPath}/${id}` : `/publisher/my-repository/${id}`
+    router.push(path)
+  }
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!checkAuth() || !canEditOrDelete || !user) return
+
+    if (!confirm(`Are you sure you want to delete "${title}"? This action cannot be undone.`)) {
+      return
+    }
+
+    const userId = (user as any).userId || (user as any).user_id
+    if (!userId) {
+      alert("User information not found. Please login again.")
+      return
+    }
+
+    try {
+      const response = await fetch("http://localhost/repository-api/publisher.php", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          operation: "delete_repository",
+          repository_id: id,
+          user_id: userId,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (result.status === "success") {
+        // Dispatch event to notify other components
+        window.dispatchEvent(new Event("repositoryDeleted"))
+        // Reload the page or remove the card
+        window.location.reload()
+      } else {
+        alert(result.message || "Failed to delete repository. Please try again.")
+      }
+    } catch (error) {
+      console.error("Error deleting repository:", error)
+      alert("Failed to delete repository. Please try again.")
+    }
   }
 
   const handleView = (e?: React.MouseEvent) => {
@@ -317,25 +375,53 @@ export default function RepositoryCard({
             <Download size={16} />
             <span className="hidden sm:inline">Download</span>
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1 gap-2 bg-transparent"
-            onClick={handleBookmark}
-            aria-label={isBookmarked ? "Remove bookmark" : "Add bookmark"}
-          >
-            {isBookmarked ? (
-              <>
-                <BookmarkCheck size={16} />
-                <span className="hidden sm:inline">Saved</span>
-              </>
-            ) : (
-              <>
-                <Bookmark size={16} />
-                <span className="hidden sm:inline">Save</span>
-              </>
-            )}
-          </Button>
+          {canEditOrDelete && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 bg-transparent text-primary hover:text-primary hover:bg-primary/10"
+                onClick={handleEdit}
+                aria-label="Edit repository"
+                title="Edit repository"
+              >
+                <Edit2 size={16} />
+                <span className="hidden sm:inline">Edit</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 bg-transparent text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={handleDelete}
+                aria-label="Delete repository"
+                title="Delete repository"
+              >
+                <Trash2 size={16} />
+                <span className="hidden sm:inline">Delete</span>
+              </Button>
+            </>
+          )}
+          {!canEditOrDelete && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 gap-2 bg-transparent"
+              onClick={handleBookmark}
+              aria-label={isBookmarked ? "Remove bookmark" : "Add bookmark"}
+            >
+              {isBookmarked ? (
+                <>
+                  <BookmarkCheck size={16} />
+                  <span className="hidden sm:inline">Saved</span>
+                </>
+              ) : (
+                <>
+                  <Bookmark size={16} />
+                  <span className="hidden sm:inline">Save</span>
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </div>
     </div>

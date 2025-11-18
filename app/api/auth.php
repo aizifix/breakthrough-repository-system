@@ -18,6 +18,84 @@ class Auth {
         $this->conn = $db;
     }
 
+    private function ensureDirectory($path) {
+        if (!is_dir($path)) {
+            if (!mkdir($path, 0775, true) && !is_dir($path)) {
+                throw new Exception("Failed to create directory: {$path}");
+            }
+        }
+    }
+
+    private function saveStudentIdImage($base64Image, $uniqueId) {
+        if (empty($base64Image)) {
+            return null;
+        }
+
+        if (!preg_match('/^data:image\/(\w+);base64,/', $base64Image, $type)) {
+            throw new Exception("Invalid student ID image format.");
+        }
+
+        $extension = strtolower($type[1]);
+        $allowed = ['jpg', 'jpeg', 'png', 'webp'];
+        if (!in_array($extension, $allowed, true)) {
+            throw new Exception("Unsupported student ID image type.");
+        }
+
+        $base64Image = substr($base64Image, strpos($base64Image, ',') + 1);
+        $base64Image = str_replace(' ', '+', $base64Image);
+        $decodedImage = base64_decode($base64Image);
+
+        if ($decodedImage === false) {
+            throw new Exception("Failed to decode student ID image.");
+        }
+
+        $uploadsDir = __DIR__ . '/uploads/student_ids';
+        $this->ensureDirectory($uploadsDir);
+
+        $filename = sprintf('student_id_%s_%s.%s', preg_replace('/[^A-Za-z0-9\-]/', '', $uniqueId), time(), $extension);
+        $filePath = $uploadsDir . '/' . $filename;
+
+        if (file_put_contents($filePath, $decodedImage) === false) {
+            throw new Exception("Failed to store student ID image.");
+        }
+
+        return 'uploads/student_ids/' . $filename;
+    }
+
+    // Create notifications for admins when a new user registers
+    private function createNewUserNotifications($userId, $userName, $userEmail) {
+        try {
+            // Get all admin users
+            $stmt = $this->conn->prepare("SELECT user_id FROM tbl_users WHERE user_role = 'admin'");
+            $stmt->execute();
+            $admins = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if (empty($admins)) {
+                return; // No admins to notify
+            }
+
+            // Create notification for each admin
+            $notificationSql = "INSERT INTO tbl_notifications (user_id, title, message, type, related_id, related_type, read_status)
+                                VALUES (:user_id, :title, :message, 'user_verification', :related_id, 'user', 0)";
+            $notificationStmt = $this->conn->prepare($notificationSql);
+
+            $title = "New User Registration";
+            $message = "A new user {$userName} ({$userEmail}) has registered and needs verification.";
+
+            foreach ($admins as $admin) {
+                $notificationStmt->execute([
+                    ':user_id' => (int)$admin['user_id'],
+                    ':title' => $title,
+                    ':message' => $message,
+                    ':related_id' => (int)$userId
+                ]);
+            }
+        } catch (PDOException $e) {
+            // Log error but don't fail registration
+            error_log("Failed to create new user notifications: " . $e->getMessage());
+        }
+    }
+
     // Generate unique user ID in format COC-BT-XXXXXX
     private function generateUniqueId() {
         // Get the highest existing number from user_unique_id
@@ -47,7 +125,7 @@ class Auth {
             $this->conn->beginTransaction();
 
             // Required fields validation
-            $required = ['user_name', 'user_email', 'user_pwd', 'user_school', 'user_department'];
+            $required = ['user_name', 'user_email', 'user_pwd', 'user_school', 'user_department', 'student_id_number', 'student_id_image'];
 
             foreach ($required as $field) {
                 if (empty($data[$field])) {
@@ -73,13 +151,26 @@ class Auth {
             // Generate unique user ID
             $uniqueId = $this->generateUniqueId();
 
+            // Store student ID image
+            $studentIdPath = null;
+            if (!empty($data['student_id_image'])) {
+                try {
+                    $studentIdPath = $this->saveStudentIdImage($data['student_id_image'], $uniqueId);
+                } catch (Exception $e) {
+                    $this->conn->rollBack();
+                    return json_encode(["status" => "error", "message" => $e->getMessage()]);
+                }
+            }
+
             // Insert into tbl_users
             $sql = "INSERT INTO tbl_users (
                 user_name, user_email, user_pwd, user_school,
-                user_department, user_role, user_type, user_contact, user_address, user_unique_id
+                user_department, user_role, user_type, user_contact, user_address, user_unique_id,
+                student_id_number, student_id_image
             ) VALUES (
                 :user_name, :user_email, :user_pwd, :user_school,
-                :user_department, :user_role, :user_type, :user_contact, :user_address, :user_unique_id
+                :user_department, :user_role, :user_type, :user_contact, :user_address, :user_unique_id,
+                :student_id_number, :student_id_image
             )";
 
             $stmt = $this->conn->prepare($sql);
@@ -93,10 +184,15 @@ class Auth {
                 ':user_type' => $data['user_type'] ?? null,
                 ':user_contact' => $data['user_contact'] ?? null,
                 ':user_address' => $data['user_address'] ?? null,
-                ':user_unique_id' => $uniqueId
+                ':user_unique_id' => $uniqueId,
+                ':student_id_number' => trim($data['student_id_number']),
+                ':student_id_image' => $studentIdPath
             ]);
 
             $userId = $this->conn->lastInsertId();
+
+            // Create notifications for all admin users about new user registration
+            $this->createNewUserNotifications($userId, trim($data['user_name']), trim($data['user_email']));
 
             $this->conn->commit();
 
@@ -175,7 +271,7 @@ class Auth {
                 return json_encode(["status" => "error", "message" => "Email is required"]);
             }
 
-            $sql = "SELECT user_id, user_name, user_email, user_role, user_school, user_department, user_type, user_contact, user_address, user_unique_id FROM tbl_users WHERE user_email = :email";
+            $sql = "SELECT user_id, user_name, user_email, user_role, user_school, user_department, user_type, user_contact, user_address, user_unique_id, student_id_number, student_id_image FROM tbl_users WHERE user_email = :email";
             $stmt = $this->conn->prepare($sql);
             $stmt->execute([':email' => $email]);
 
@@ -217,7 +313,7 @@ class Auth {
                 return json_encode(["status" => "error", "message" => "User ID is required"]);
             }
 
-            $sql = "SELECT user_id, user_name, user_email, user_role, user_school, user_department, user_type, user_contact, user_address, user_unique_id FROM tbl_users WHERE user_id = :user_id";
+            $sql = "SELECT user_id, user_name, user_email, user_role, user_school, user_department, user_type, user_contact, user_address, user_unique_id, student_id_number, student_id_image FROM tbl_users WHERE user_id = :user_id";
             $stmt = $this->conn->prepare($sql);
             $stmt->execute([':user_id' => $userId]);
 

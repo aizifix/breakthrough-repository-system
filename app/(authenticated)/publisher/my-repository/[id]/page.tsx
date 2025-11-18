@@ -12,7 +12,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { ArrowLeft, FileText, Download, Trash2, X, CheckCircle2 } from "lucide-react"
+import { ArrowLeft, FileText, Download, Trash2, X, CheckCircle2, Edit2 } from "lucide-react"
 import RepositorySocialFeatures from "@/components/repository-social-features"
 import {
   AlertDialog,
@@ -300,7 +300,10 @@ export default function ResearchDetailPage() {
   }
 
   const handleDelete = async () => {
-    if (!user || !research) return
+    if (!user || !research || !canEdit) {
+      alert("You can only delete repositories that are pending or unpublished.")
+      return
+    }
 
     // Get user ID
     const userId = (user as any).userId || (user as any).user_id
@@ -534,7 +537,7 @@ export default function ResearchDetailPage() {
             <ArrowLeft size={16} />
             Back
           </Button>
-          {isOwner && (
+          {isOwner && canEdit && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" className="gap-2" disabled={isDeleting}>
@@ -615,10 +618,10 @@ export default function ResearchDetailPage() {
               {canEdit && (
                 <button
                   onClick={() => openEditDialog("title")}
-                  className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-muted rounded-md"
+                  className="absolute top-0 right-0 opacity-40 group-hover:opacity-100 transition-opacity p-2 hover:bg-muted rounded-md"
                   title="Edit title"
                 >
-                  <FileText size={18} className="text-muted-foreground hover:text-foreground" />
+                  <Edit2 size={18} className="text-muted-foreground hover:text-primary" />
                 </button>
               )}
             </div>
@@ -631,10 +634,10 @@ export default function ResearchDetailPage() {
                   {canEdit && (
                     <button
                       onClick={() => openEditDialog("categories")}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded-md"
+                      className="opacity-40 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded-md"
                       title="Edit categories"
                     >
-                      <FileText size={16} className="text-muted-foreground hover:text-foreground" />
+                      <Edit2 size={16} className="text-muted-foreground hover:text-primary" />
                     </button>
                   )}
                 </div>
@@ -655,10 +658,10 @@ export default function ResearchDetailPage() {
                   {canEdit && (
                     <button
                       onClick={() => openEditDialog("keywords")}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded-md"
+                      className="opacity-40 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded-md"
                       title="Edit keywords"
                     >
-                      <FileText size={16} className="text-muted-foreground hover:text-foreground" />
+                      <Edit2 size={16} className="text-muted-foreground hover:text-primary" />
                     </button>
                   )}
                 </div>
@@ -682,10 +685,10 @@ export default function ResearchDetailPage() {
                 {canEdit && (
                   <button
                     onClick={() => openEditDialog("abstract")}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded-md"
+                    className="opacity-40 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded-md"
                     title="Edit abstract"
                   >
-                    <FileText size={18} className="text-muted-foreground hover:text-foreground" />
+                    <Edit2 size={18} className="text-muted-foreground hover:text-primary" />
                   </button>
                 )}
               </div>
@@ -700,10 +703,10 @@ export default function ResearchDetailPage() {
                   {canEdit && (
                     <button
                       onClick={() => openEditDialog("pdf")}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded-md"
+                      className="opacity-40 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded-md"
                       title="Replace PDF"
                     >
-                      <FileText size={18} className="text-muted-foreground hover:text-foreground" />
+                      <Edit2 size={18} className="text-muted-foreground hover:text-primary" />
                     </button>
                   )}
                 </div>

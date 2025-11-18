@@ -22,9 +22,10 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { User, Mail, Building2, Briefcase, FileText, User as PhoneIcon, Mail as MapIcon, Download, FileText as Edit2, ArrowLeft, Fingerprint } from "lucide-react"
+import { User, Mail, Building2, Briefcase, FileText, User as PhoneIcon, Mail as MapIcon, Download, FileText as Edit2, ArrowLeft, Fingerprint, CreditCard, Image as ImageIcon, CheckCircle2, AlertCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getUserProfile } from "@/app/config/api"
+import { Badge } from "@/components/ui/badge"
 
 interface UserProfile {
   name: string
@@ -33,6 +34,7 @@ interface UserProfile {
   role?: string
   userId?: number
   uniqueId?: string
+  isVerified?: boolean
   // Extended profile fields
   institution?: string
   department?: string
@@ -43,6 +45,8 @@ interface UserProfile {
   researchType?: string
   researchArea?: string
   keywords?: string
+  studentIdNumber?: string
+  studentIdImage?: string
 }
 
 export default function ProfilePage() {
@@ -57,6 +61,7 @@ export default function ProfilePage() {
     name: "",
     email: "",
     uniqueId: "",
+    isVerified: false,
     institution: "",
     department: "",
     position: "",
@@ -66,6 +71,8 @@ export default function ProfilePage() {
     researchType: "",
     researchArea: "",
     keywords: "",
+    studentIdNumber: "",
+    studentIdImage: "",
   })
 
   // Load user and profile data from API
@@ -94,11 +101,14 @@ export default function ProfilePage() {
                     role: apiUser.user_role || userData.role,
                     userId: apiUser.user_id,
                     uniqueId: apiUser.user_unique_id || userData.uniqueId,
+                    isVerified: (apiUser as any).is_verified ?? false,
                     institution: apiUser.user_school || "",
                     department: apiUser.user_department || "",
                     position: apiUser.user_type || "",
                     contactNumber: apiUser.user_contact || "",
                     address: apiUser.user_address || "",
+                    studentIdNumber: (apiUser as any).student_id_number || "",
+                    studentIdImage: (apiUser as any).student_id_image || "",
                     // These fields might not be in the database yet, so check localStorage
                     biography: "",
                     researchType: "",
@@ -288,11 +298,28 @@ export default function ProfilePage() {
         <div className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
-              <h1 className="text-2xl font-bold text-foreground mb-2 flex items-center gap-2">
-                <User size={24} className="text-primary" />
-                Profile
-              </h1>
-              <p className="text-sm text-muted-foreground">View and manage your profile information</p>
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+                  <User size={24} className="text-primary" />
+                  Profile
+                </h1>
+                {profile.isVerified ? (
+                  <Badge className="bg-green-600 hover:bg-green-700 text-white border-green-700">
+                    <CheckCircle2 size={14} />
+                    Verified
+                  </Badge>
+                ) : (
+                  <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-600">
+                    <AlertCircle size={14} />
+                    Not Verified
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {profile.isVerified
+                  ? "Your account has been verified by admin/staff"
+                  : "Please wait for admin/staff to review your account"}
+              </p>
             </div>
             {!isEditing && (
               <Button
@@ -427,6 +454,69 @@ export default function ProfilePage() {
                   </Select>
                 ) : (
                   <p className="text-foreground">{profile.position || "Not provided"}</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Student ID Information Section */}
+          <div className="space-y-4 pt-4 border-t border-border">
+            <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+              <CreditCard size={20} className="text-primary" />
+              Student ID Information
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="studentIdNumber" className="text-foreground font-medium flex items-center gap-2">
+                  <CreditCard size={16} />
+                  Student ID Number
+                </Label>
+                {isEditing ? (
+                  <Input
+                    id="studentIdNumber"
+                    type="text"
+                    placeholder="e.g., 2021-12345"
+                    value={formData.studentIdNumber || ""}
+                    onChange={(e) => handleInputChange("studentIdNumber", e.target.value)}
+                    className="bg-input border-border"
+                    disabled
+                  />
+                ) : (
+                  <div className="px-4 py-2 bg-muted/50 border border-border rounded-md">
+                    <p className="text-foreground">{profile.studentIdNumber || "Not provided"}</p>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">This field cannot be edited after registration.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="studentIdImage" className="text-foreground font-medium flex items-center gap-2">
+                  <ImageIcon size={16} />
+                  Student ID Photo
+                </Label>
+                {profile.studentIdImage ? (
+                  <div className="rounded-lg border border-border bg-muted/30 p-4">
+                    <div className="w-full overflow-hidden rounded-md border border-border bg-background">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`http://localhost/repository-api/${profile.studentIdImage}`}
+                        alt="Student ID"
+                        className="w-full h-48 object-contain bg-background"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.style.display = 'none'
+                          const parent = target.parentElement
+                          if (parent) {
+                            parent.innerHTML = '<p class="text-muted-foreground text-sm p-4">Image not found</p>'
+                          }
+                        }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">Uploaded student ID for verification</p>
+                  </div>
+                ) : (
+                  <div className="px-4 py-8 bg-muted/50 border border-border rounded-md text-center">
+                    <p className="text-muted-foreground">No student ID photo uploaded</p>
+                  </div>
                 )}
               </div>
             </div>
