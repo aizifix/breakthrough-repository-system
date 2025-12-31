@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -22,9 +22,18 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { User, Mail, Building2, Briefcase, FileText, User as PhoneIcon, Mail as MapIcon, Download, FileText as Edit2, ArrowLeft, Fingerprint, CreditCard, Image as ImageIcon, CheckCircle2, AlertCircle } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { User, Mail, Building2, Briefcase, FileText, Phone as PhoneIcon, MapPin, Edit2, ArrowLeft, Fingerprint, Shield, Plus, X, CheckCircle2, Upload, RefreshCw, Download, CircleX, CircleAlert, AlertCircle, XCircle, Bookmark, BookmarkCheck, Eye, Trash2, CreditCard, Image, MoreVertical, Settings, LogOut, LogIn, FolderOpen, Bell, Clock, Home, Users, FileBarChart, BarChart, Megaphone, LayoutDashboard, ShieldCheck, ChevronLeft, ChevronRight, Crown, TrendingUp, BookOpen } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { getUserProfile } from "@/app/config/api"
+import { getUserProfile, uploadStudentIdImage } from "@/app/config/api"
 import { Badge } from "@/components/ui/badge"
 
 interface UserProfile {
@@ -57,6 +66,13 @@ export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [showCredentialDialog, setShowCredentialDialog] = useState(false)
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [isViewingImage, setIsViewingImage] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [formData, setFormData] = useState<UserProfile>({
     name: "",
     email: "",
@@ -239,6 +255,125 @@ export default function ProfilePage() {
       setFormData(profile)
     }
     setIsEditing(false)
+  }
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: "Please select an image under 5MB",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf']
+      if (!allowedTypes.includes(file.type)) {
+        toast({
+          title: "Invalid file type",
+          description: "Please select a JPEG, PNG, GIF, or PDF file",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setSelectedFile(file)
+      const objectUrl = URL.createObjectURL(file)
+      setPreviewUrl(objectUrl)
+      setShowConfirmDialog(true)
+    }
+  }
+
+  const handleUploadCredential = async () => {
+    if (!selectedFile || !user) {
+      toast({
+        title: "Error",
+        description: "User not found. Please login again.",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    const userIdValue = user.userId ?? (user as any).user_id
+    console.log("User ID value:", userIdValue, "User object:", user)
+    
+    if (!userIdValue) {
+      toast({
+        title: "Error",
+        description: "User ID not found. Please login again.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const userId = Number(userIdValue)
+    if (isNaN(userId)) {
+      toast({
+        title: "Error",
+        description: "Invalid user ID. Please login again.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    console.log("Starting upload for userId:", userId, "file:", selectedFile.name)
+
+    setIsUploading(true)
+    try {
+      const response = await uploadStudentIdImage(userId, selectedFile)
+      console.log("Upload response:", response)
+      if (response.status === "success") {
+        toast({
+          title: "Upload successful",
+          description: "Your credential has been uploaded and is pending admin verification.",
+        })
+        
+        // Reload profile data
+        const profileResponse = await getUserProfile(userId)
+        if (profileResponse.status === "success" && profileResponse.user) {
+          const apiUser = profileResponse.user as any
+          setProfile((prev) => prev ? {
+            ...prev,
+            studentIdImage: apiUser.student_id_image || ""
+          } : null)
+        }
+        
+        setShowConfirmDialog(false)
+        setShowCredentialDialog(false)
+        setSelectedFile(null)
+        setPreviewUrl(null)
+      } else {
+        toast({
+          title: "Upload failed",
+          description: response.message || "Failed to upload credential. Please try again.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Upload error:", error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again. Check console for details.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const handleCancelUpload = () => {
+    setSelectedFile(null)
+    setPreviewUrl(null)
+    setShowConfirmDialog(false)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const openFileDialog = () => {
+    fileInputRef.current?.click()
   }
 
   // Generate avatar initials
@@ -488,9 +623,9 @@ export default function ProfilePage() {
                 )}
                 <p className="text-xs text-muted-foreground">This field cannot be edited after registration.</p>
               </div>
-              <div className="space-y-2">
+                <div className="space-y-2">
                 <Label htmlFor="studentIdImage" className="text-foreground font-medium flex items-center gap-2">
-                  <ImageIcon size={16} />
+                  <Image size={16} />
                   Student ID Photo
                 </Label>
                 {profile.studentIdImage ? (
@@ -511,11 +646,152 @@ export default function ProfilePage() {
                         }}
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2">Uploaded student ID for verification</p>
+                    <div className="flex gap-2 mt-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsViewingImage(true)}
+                        className="gap-1"
+                      >
+                        <Eye size={14} />
+                        View
+                      </Button>
+                      <Dialog open={showCredentialDialog} onOpenChange={setShowCredentialDialog}>
+                        <DialogTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="gap-1"
+                          >
+                            <Upload size={14} />
+                            Update
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-md">
+                          <DialogHeader>
+                            <DialogTitle>Update Student ID</DialogTitle>
+                            <DialogDescription>
+                              Upload a new student ID photo. Your previous ID will be replaced and subject to admin verification.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="flex flex-col gap-4 py-4">
+                            <input
+                              type="file"
+                              ref={fileInputRef}
+                              onChange={handleFileSelect}
+                              accept="image/jpeg,image/png,image/gif,application/pdf"
+                              className="hidden"
+                            />
+                            <div
+                              className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                              onClick={openFileDialog}
+                            >
+                              <Upload className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
+                              <p className="text-sm font-medium text-foreground">Click to upload</p>
+                              <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, GIF or PDF (max 5MB)</p>
+                            </div>
+                            {selectedFile && previewUrl && (
+                              <div className="border border-border rounded-md p-3">
+                                <p className="text-sm font-medium mb-2">Selected file:</p>
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-4 w-4 text-muted-foreground" />
+                                  <span className="text-sm truncate">{selectedFile.name}</span>
+                                  <span className="text-xs text-muted-foreground">({Math.round(selectedFile.size / 1024)} KB)</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <DialogFooter className="sm:justify-end">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setShowCredentialDialog(false)}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              type="button"
+                              onClick={handleUploadCredential}
+                              disabled={!selectedFile || isUploading}
+                            >
+                              {isUploading ? "Uploading..." : "Upload"}
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {profile.isVerified 
+                        ? "Your credential has been verified by admin/staff" 
+                        : "Pending admin verification. You can upload a new one if needed."}
+                    </p>
                   </div>
                 ) : (
-                  <div className="px-4 py-8 bg-muted/50 border border-border rounded-md text-center">
-                    <p className="text-muted-foreground">No student ID photo uploaded</p>
+                  <div className="space-y-3">
+                    <div className="px-4 py-8 bg-muted/50 border border-border rounded-md text-center">
+                      <p className="text-muted-foreground">No student ID photo uploaded</p>
+                    </div>
+                    <Dialog open={showCredentialDialog} onOpenChange={setShowCredentialDialog}>
+                      <DialogTrigger asChild>
+                        <Button className="w-full gap-2">
+                          <Upload size={16} />
+                          Upload Student ID
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Upload Student ID</DialogTitle>
+                          <DialogDescription>
+                            Upload a clear photo of your student ID for verification. This is required to publish research papers.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="flex flex-col gap-4 py-4">
+                          <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileSelect}
+                            accept="image/jpeg,image/png,image/gif,application/pdf"
+                            className="hidden"
+                          />
+                          <div
+                            className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                            onClick={openFileDialog}
+                          >
+                            <Upload className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
+                            <p className="text-sm font-medium text-foreground">Click to upload</p>
+                            <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, GIF or PDF (max 5MB)</p>
+                          </div>
+                          {selectedFile && previewUrl && (
+                            <div className="border border-border rounded-md p-3">
+                              <p className="text-sm font-medium mb-2">Selected file:</p>
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm truncate">{selectedFile.name}</span>
+                                <span className="text-xs text-muted-foreground">({Math.round(selectedFile.size / 1024)} KB)</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <DialogFooter className="sm:justify-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setShowCredentialDialog(false)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={handleUploadCredential}
+                            disabled={!selectedFile || isUploading}
+                          >
+                            {isUploading ? "Uploading..." : "Upload"}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 )}
               </div>
@@ -569,7 +845,7 @@ export default function ProfilePage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="address" className="text-foreground font-medium flex items-center gap-2">
-                    <MapIcon size={16} />
+                    <MapPin size={16} />
                     Address
                   </Label>
                   {isEditing ? (
@@ -692,6 +968,95 @@ export default function ProfilePage() {
             </div>
           )}
         </div>
+
+        {/* Confirmation Dialog for Upload */}
+        <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CircleAlert className="h-5 w-5 text-amber-500" />
+                Confirm Upload
+              </DialogTitle>
+              <DialogDescription>
+                Please review your uploaded document before confirming.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col gap-4 py-4">
+              {previewUrl && (
+                <div className="border border-border rounded-md overflow-hidden">
+                  {selectedFile?.type === 'application/pdf' ? (
+                    <div className="bg-muted p-8 text-center">
+                      <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                      <p className="text-sm text-muted-foreground">PDF Document</p>
+                      <p className="text-xs text-muted-foreground">{selectedFile.name}</p>
+                    </div>
+                  ) : (
+                    <img
+                      src={previewUrl}
+                      alt="Preview"
+                      className="w-full h-48 object-contain bg-background"
+                    />
+                  )}
+                </div>
+              )}
+              <div className="bg-muted/50 rounded-md p-3 text-sm">
+                <p className="font-medium">File Information:</p>
+                <p className="text-muted-foreground">Name: {selectedFile?.name}</p>
+                <p className="text-muted-foreground">Size: {selectedFile ? Math.round(selectedFile.size / 1024) : 0} KB</p>
+                <p className="text-muted-foreground">Type: {selectedFile?.type}</p>
+              </div>
+              <p className="text-xs text-amber-600 flex items-center gap-1">
+                <CircleAlert className="h-3 w-3" />
+                By confirming, you declare that this document is authentic and belongs to you.
+              </p>
+            </div>
+            <DialogFooter className="sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCancelUpload}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleUploadCredential}
+                disabled={isUploading}
+              >
+                {isUploading ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Confirm & Upload
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Image Viewer Dialog */}
+        <Dialog open={isViewingImage} onOpenChange={setIsViewingImage}>
+          <DialogContent className="sm:max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Student ID Photo</DialogTitle>
+            </DialogHeader>
+            <div className="flex justify-center py-4">
+              {profile.studentIdImage && (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={`http://localhost/repository-api/${profile.studentIdImage}`}
+                  alt="Student ID Full View"
+                  className="max-h-[70vh] w-full object-contain"
+                />
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </main>
   )

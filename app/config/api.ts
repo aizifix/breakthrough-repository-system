@@ -104,7 +104,7 @@ export interface User {
  * Register a new user
  */
 export const register = async (data: RegisterData): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/auth.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/auth.php', {
     operation: 'register',
     ...data,
   });
@@ -115,7 +115,7 @@ export const register = async (data: RegisterData): Promise<ApiResponse> => {
  * Login user
  */
 export const login = async (data: LoginData): Promise<ApiResponse<User>> => {
-  const response: AxiosResponse<ApiResponse<User>> = await apiClient.post('/auth.php', {
+  const response: AxiosResponse<ApiResponse<User>> = await apiClient.post('/api/auth.php', {
     operation: 'login',
     email: data.email,
     password: data.password,
@@ -127,7 +127,7 @@ export const login = async (data: LoginData): Promise<ApiResponse<User>> => {
  * Logout user
  */
 export const logout = async (userId: number): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/auth.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/auth.php', {
     operation: 'logout',
     user_id: userId,
   });
@@ -138,9 +138,38 @@ export const logout = async (userId: number): Promise<ApiResponse> => {
  * Get user profile by user ID
  */
 export const getUserProfile = async (userId: number): Promise<ApiResponse<User>> => {
-  const response: AxiosResponse<ApiResponse<User>> = await apiClient.post('/auth.php', {
+  const response: AxiosResponse<ApiResponse<User>> = await apiClient.post('/api/auth.php', {
     operation: 'get_user_profile',
     user_id: userId,
+  });
+  return response.data;
+};
+
+/**
+ * Update user profile
+ */
+export const updateUserProfile = async (userId: number, data: any): Promise<ApiResponse> => {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/auth.php', {
+    operation: 'update_profile',
+    user_id: userId,
+    ...data,
+  });
+  return response.data;
+};
+
+/**
+ * Upload student ID image
+ */
+export const uploadStudentIdImage = async (userId: number, file: File): Promise<ApiResponse> => {
+  const formData = new FormData();
+  formData.append('operation', 'upload_student_id');
+  formData.append('user_id', userId.toString());
+  formData.append('student_id_image', file);
+
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/auth.php', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
   });
   return response.data;
 };
@@ -153,20 +182,34 @@ export const getUserProfile = async (userId: number): Promise<ApiResponse<User>>
  * Get publisher repositories
  */
 export const getPublisherRepositories = async (userId?: number, currentUserId?: number): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/publisher.php', {
-    operation: 'get_repositories',
-    user_id: userId,
-    current_user_id: currentUserId,
-    userId: currentUserId,
-  });
-  return response.data;
+  try {
+    const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/publisher.php', {
+      operation: 'get_repositories',
+      user_id: userId,
+      current_user_id: currentUserId,
+      userId: currentUserId,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error in getPublisherRepositories:', error);
+    if (axios.isAxiosError(error)) {
+      return {
+        status: 'error',
+        message: error.response?.data?.message || error.message || 'Failed to fetch publisher repositories'
+      };
+    }
+    return {
+      status: 'error',
+      message: 'An unexpected error occurred while fetching publisher repositories'
+    };
+  }
 };
 
 /**
  * Create new repository
  */
 export const createRepository = async (data: any): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/publisher.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/publisher.php', {
     operation: 'create_repository',
     ...data,
   });
@@ -177,7 +220,7 @@ export const createRepository = async (data: any): Promise<ApiResponse> => {
  * Update repository
  */
 export const updateRepository = async (repositoryId: number, data: any): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/publisher.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/publisher.php', {
     operation: 'update_repository',
     repository_id: repositoryId,
     ...data,
@@ -189,7 +232,7 @@ export const updateRepository = async (repositoryId: number, data: any): Promise
  * Delete repository
  */
 export const deleteRepository = async (repositoryId: number): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/publisher.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/publisher.php', {
     operation: 'delete_repository',
     repository_id: repositoryId,
   });
@@ -200,18 +243,32 @@ export const deleteRepository = async (repositoryId: number): Promise<ApiRespons
  * Get saved repositories
  */
 export const getSavedRepositories = async (userId: number): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/publisher.php', {
-    operation: 'get_saved_repositories',
-    user_id: userId,
-  });
-  return response.data;
+  try {
+    const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/publisher.php', {
+      operation: 'get_saved_repositories',
+      user_id: userId,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error in getSavedRepositories:', error);
+    if (axios.isAxiosError(error)) {
+      return {
+        status: 'error',
+        message: error.response?.data?.message || error.message || 'Failed to fetch saved repositories'
+      };
+    }
+    return {
+      status: 'error',
+      message: 'An unexpected error occurred while fetching saved repositories'
+    };
+  }
 };
 
 /**
  * Save repository
  */
 export const saveRepository = async (userId: number, repositoryId: number): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/publisher.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/publisher.php', {
     operation: 'save_repository',
     user_id: userId,
     repository_id: repositoryId,
@@ -223,7 +280,7 @@ export const saveRepository = async (userId: number, repositoryId: number): Prom
  * Unsave repository
  */
 export const unsaveRepository = async (userId: number, repositoryId: number): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/publisher.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/publisher.php', {
     operation: 'unsave_repository',
     user_id: userId,
     repository_id: repositoryId,
@@ -239,7 +296,7 @@ export const unsaveRepository = async (userId: number, repositoryId: number): Pr
  * Get all users
  */
 export const getUsers = async (): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/admin.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/admin.php', {
     operation: 'get_users',
   });
   return response.data;
@@ -249,7 +306,7 @@ export const getUsers = async (): Promise<ApiResponse> => {
  * Get user by ID
  */
 export const getUserById = async (userId: number): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/admin.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/admin.php', {
     operation: 'get_user',
     user_id: userId,
   });
@@ -260,7 +317,7 @@ export const getUserById = async (userId: number): Promise<ApiResponse> => {
  * Update user
  */
 export const updateUser = async (userId: number, data: any): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/admin.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/admin.php', {
     operation: 'update_user',
     user_id: userId,
     ...data,
@@ -272,7 +329,7 @@ export const updateUser = async (userId: number, data: any): Promise<ApiResponse
  * Delete user
  */
 export const deleteUser = async (userId: number): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/admin.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/admin.php', {
     operation: 'delete_user',
     user_id: userId,
   });
@@ -283,7 +340,7 @@ export const deleteUser = async (userId: number): Promise<ApiResponse> => {
  * Verify or unverify user
  */
 export const verifyUser = async (userId: number, isVerified: boolean): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/admin.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/admin.php', {
     operation: 'verify_user',
     user_id: userId,
     is_verified: isVerified,
@@ -295,7 +352,7 @@ export const verifyUser = async (userId: number, isVerified: boolean): Promise<A
  * Get repositories for moderation
  */
 export const getRepositoriesForModeration = async (): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/admin.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/admin.php', {
     operation: 'get_repositories_moderation',
   });
   return response.data;
@@ -305,7 +362,7 @@ export const getRepositoriesForModeration = async (): Promise<ApiResponse> => {
  * Approve repository
  */
 export const approveRepository = async (repositoryId: number, publishedDate?: string): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/admin.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/admin.php', {
     operation: 'approve_repository',
     repository_id: repositoryId,
     published_date: publishedDate,
@@ -317,7 +374,7 @@ export const approveRepository = async (repositoryId: number, publishedDate?: st
  * Reject repository
  */
 export const rejectRepository = async (repositoryId: number, reason?: string): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/admin.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/admin.php', {
     operation: 'reject_repository',
     repository_id: repositoryId,
     reason: reason,
@@ -329,7 +386,7 @@ export const rejectRepository = async (repositoryId: number, reason?: string): P
  * Unpublish repository
  */
 export const unpublishRepository = async (repositoryId: number): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/admin.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/admin.php', {
     operation: 'unpublish_repository',
     repository_id: repositoryId,
   });
@@ -340,7 +397,7 @@ export const unpublishRepository = async (repositoryId: number): Promise<ApiResp
  * Get dashboard statistics
  */
 export const getDashboardStats = async (): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/admin.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/admin.php', {
     operation: 'get_dashboard_stats',
   });
   return response.data;
@@ -350,7 +407,7 @@ export const getDashboardStats = async (): Promise<ApiResponse> => {
  * Get all publishers with their repositories
  */
 export const getPublishers = async (): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/admin.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/admin.php', {
     operation: 'get_publishers',
   });
   return response.data;
@@ -364,20 +421,43 @@ export const getPublishers = async (): Promise<ApiResponse> => {
  * Get all repositories (public)
  */
 export const getAllRepositories = async (filters?: any, userId?: number): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/general.php', {
-    operation: 'get_repositories',
-    ...filters,
-    user_id: userId,
-    userId: userId,
-  });
-  return response.data;
+  try {
+    const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/general.php', {
+      operation: 'get_repositories',
+      ...filters,
+      user_id: userId,
+      userId: userId,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error in getAllRepositories:', error);
+    console.error('Full error details:', error);
+    if (axios.isAxiosError(error)) {
+      console.error('Axios error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        config: error.config
+      });
+      return {
+        status: 'error',
+        message: error.response?.data?.message || error.message || 'Failed to fetch repositories',
+        errorDetails: error.response?.data || error.message
+      };
+    }
+    return {
+      status: 'error',
+      message: 'An unexpected error occurred while fetching repositories',
+      errorDetails: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
 };
 
 /**
  * Get repository by ID
  */
 export const getRepositoryById = async (repositoryId: number): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/general.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/general.php', {
     operation: 'get_repository',
     repository_id: repositoryId,
   });
@@ -388,7 +468,7 @@ export const getRepositoryById = async (repositoryId: number): Promise<ApiRespon
  * Search repositories
  */
 export const searchRepositories = async (query: string, filters?: any): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/general.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/general.php', {
     operation: 'search_repositories',
     query: query,
     ...filters,
@@ -404,7 +484,7 @@ export const searchRepositories = async (query: string, filters?: any): Promise<
  * Get user notifications
  */
 export const getNotifications = async (userId: number, unreadOnly: boolean = false): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/notifications.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/notifications.php', {
     operation: 'get_notifications',
     user_id: userId,
     unread_only: unreadOnly,
@@ -416,7 +496,7 @@ export const getNotifications = async (userId: number, unreadOnly: boolean = fal
  * Get unread notification count
  */
 export const getUnreadCount = async (userId: number): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/notifications.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/notifications.php', {
     operation: 'get_unread_count',
     user_id: userId,
   });
@@ -427,7 +507,7 @@ export const getUnreadCount = async (userId: number): Promise<ApiResponse> => {
  * Mark notification as read
  */
 export const markNotificationAsRead = async (notificationId: number, userId: number): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/notifications.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/notifications.php', {
     operation: 'mark_as_read',
     notification_id: notificationId,
     user_id: userId,
@@ -439,7 +519,7 @@ export const markNotificationAsRead = async (notificationId: number, userId: num
  * Mark all notifications as read
  */
 export const markAllNotificationsAsRead = async (userId: number): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/notifications.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/notifications.php', {
     operation: 'mark_all_as_read',
     user_id: userId,
   });
@@ -456,8 +536,7 @@ export const markAllNotificationsAsRead = async (userId: number): Promise<ApiRes
  * For all announcements (admin), use admin.php
  */
 export const getAnnouncements = async (publishedOnly: boolean = false): Promise<ApiResponse> => {
-  // Use general.php for public published announcements, admin.php for admin operations
-  const endpoint = publishedOnly ? '/general.php' : '/admin.php';
+  const endpoint = publishedOnly ? '/api/general.php' : '/api/admin.php';
   const response: AxiosResponse<ApiResponse> = await apiClient.post(endpoint, {
     operation: 'get_announcements',
     published_only: publishedOnly,
@@ -474,7 +553,7 @@ export const createAnnouncement = async (data: {
   published: boolean;
   created_by: number;
 }): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/admin.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/admin.php', {
     operation: 'create_announcement',
     ...data,
   });
@@ -489,7 +568,7 @@ export const updateAnnouncement = async (announcementId: number, data: {
   content: string;
   published: boolean;
 }): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/admin.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/admin.php', {
     operation: 'update_announcement',
     announcement_id: announcementId,
     ...data,
@@ -501,7 +580,7 @@ export const updateAnnouncement = async (announcementId: number, data: {
  * Delete announcement
  */
 export const deleteAnnouncement = async (announcementId: number): Promise<ApiResponse> => {
-  const response: AxiosResponse<ApiResponse> = await apiClient.post('/admin.php', {
+  const response: AxiosResponse<ApiResponse> = await apiClient.post('/api/admin.php', {
     operation: 'delete_announcement',
     announcement_id: announcementId,
   });

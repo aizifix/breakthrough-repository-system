@@ -59,6 +59,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { getPublishers, approveRepository, rejectRepository, unpublishRepository } from "@/app/config/api"
+import { UserTableSkeletonList } from "@/components/user-table-skeleton"
+import RepositoryCardSkeleton from "@/components/repository-card-skeleton"
 
 interface Publisher {
   id: string
@@ -126,7 +128,6 @@ export default function PublishersPage() {
       const response = await getPublishers()
 
       if (response.status === "success" && response.data) {
-        // Format the data to match expected structure
         const formattedPublishers: Publisher[] = response.data.map((pub: any) => ({
           id: pub.id.toString(),
           name: pub.name,
@@ -146,7 +147,7 @@ export default function PublishersPage() {
 
         setPublishers(formattedPublishers)
       } else {
-        console.error("Failed to load publishers:", response.message)
+        console.error("Failed to load publishers:", response.message || "Unknown error")
         setPublishers([])
       }
     } catch (error) {
@@ -210,13 +211,12 @@ export default function PublishersPage() {
       }
 
       if (response.status === "success") {
-        // Reload publishers to reflect changes
         await loadPublishers()
         setIsActionDialogOpen(false)
         setSelectedRepository(null)
         setActionType(null)
       } else {
-        alert(response.message || "Failed to update repository. Please try again.")
+        alert(response?.message || "Failed to update repository. Please try again.")
       }
     } catch (error) {
       console.error("Error updating repository:", error)
@@ -370,9 +370,39 @@ export default function PublishersPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-sm text-muted-foreground">Loading publishers...</p>
+              <div className="space-y-4">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="border border-border rounded-lg p-4 bg-card">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4 flex-1">
+                        <div className="w-10 h-10 rounded-full bg-muted animate-pulse"></div>
+                        <div className="flex-1">
+                          <div className="h-5 bg-muted rounded w-48 overflow-hidden relative mb-2">
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent animate-[shimmer_2s_infinite]"></div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="h-4 bg-muted rounded w-40 overflow-hidden relative">
+                              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent animate-[shimmer_2s_infinite]" style={{ animationDelay: "100ms" }}></div>
+                            </div>
+                            <div className="h-4 bg-muted rounded w-32 overflow-hidden relative">
+                              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent animate-[shimmer_2s_infinite]" style={{ animationDelay: "200ms" }}></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-6">
+                        <div className="text-center">
+                          <div className="h-6 bg-muted rounded w-8 overflow-hidden relative mb-1">
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent animate-[shimmer_2s_infinite]" style={{ animationDelay: "300ms" }}></div>
+                          </div>
+                          <div className="h-3 bg-muted rounded w-20 overflow-hidden relative">
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent animate-[shimmer_2s_infinite]" style={{ animationDelay: "400ms" }}></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : filteredPublishers.length === 0 ? (
               <div className="text-center py-12">

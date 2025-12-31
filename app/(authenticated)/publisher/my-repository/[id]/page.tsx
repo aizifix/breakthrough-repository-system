@@ -125,7 +125,7 @@ export default function ResearchDetailPage() {
           if (!hasIncremented && !viewIncrementedRef.current) {
             viewIncrementedRef.current = true
             try {
-              await fetch("http://localhost/repository-api/publisher.php", {
+              await fetch("http://localhost/repository-api/api/publisher.php", {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
@@ -145,7 +145,7 @@ export default function ResearchDetailPage() {
           }
 
           // Then fetch repository data
-          const response = await fetch("http://localhost/repository-api/publisher.php", {
+          const response = await fetch("http://localhost/repository-api/api/publisher.php", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -209,7 +209,7 @@ export default function ResearchDetailPage() {
   //   setPlagiarismError(null)
 
   //   try {
-  //     const response = await fetch("http://localhost/repository-api/publisher.php", {
+  //     const response = await fetch("http://localhost/repository-api/api/publisher.php", {
   //       method: "POST",
   //       headers: {
   //         "Content-Type": "application/json",
@@ -315,7 +315,7 @@ export default function ResearchDetailPage() {
     setIsDeleting(true)
 
     try {
-      const response = await fetch("http://localhost/repository-api/publisher.php", {
+      const response = await fetch("http://localhost/repository-api/api/publisher.php", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -446,7 +446,7 @@ export default function ResearchDetailPage() {
         }
       }
 
-      const response = await fetch("http://localhost/repository-api/publisher.php", {
+      const response = await fetch("http://localhost/repository-api/api/publisher.php", {
         method: "POST",
         body: formData,
       })
@@ -455,7 +455,7 @@ export default function ResearchDetailPage() {
 
       if (result.status === "success") {
         // Reload repository data
-        const reloadResponse = await fetch("http://localhost/repository-api/publisher.php", {
+        const reloadResponse = await fetch("http://localhost/repository-api/api/publisher.php", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

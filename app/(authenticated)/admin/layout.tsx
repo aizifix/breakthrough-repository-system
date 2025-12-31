@@ -12,7 +12,7 @@ export default function AdminLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
-  const [user, setUser] = useState<{ name: string; email: string; role?: string; avatar?: string } | null>(null)
+  const [user, setUser] = useState<{ name?: string; email: string; role?: string; avatar?: string } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     if (typeof window !== "undefined") {
@@ -21,36 +21,67 @@ export default function AdminLayout({
     }
     return false
   })
+  const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    setIsMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!isMounted) return
+
+    const checkAuth = () => {
       const stored = localStorage.getItem("user")
       if (stored) {
         const userData = JSON.parse(stored)
         setUser(userData)
-        // Redirect if not admin
         if (userData.role !== "admin") {
-          router.push("/")
+          window.history.replaceState(null, "", "/")
+          router.replace("/")
         }
       } else {
-        router.push("/auth/login")
+        window.history.replaceState(null, "", "/auth/login")
+        router.replace("/auth/login")
       }
       setIsLoading(false)
-
-      // Listen for sidebar toggle events
-      const handleSidebarToggle = (e: CustomEvent) => {
-        setIsSidebarCollapsed(e.detail.collapsed)
-      }
-
-      window.addEventListener("sidebarToggle" as any, handleSidebarToggle as EventListener)
-
-      return () => {
-        window.removeEventListener("sidebarToggle" as any, handleSidebarToggle as EventListener)
-      }
     }
-  }, [router])
 
-  if (isLoading) {
+    checkAuth()
+
+    const handleLogout = () => {
+      setUser(null)
+      window.history.replaceState(null, "", "/auth/login")
+      router.replace("/auth/login")
+    }
+
+    const handleSidebarToggle = (e: CustomEvent) => {
+      setIsSidebarCollapsed(e.detail.collapsed)
+    }
+
+    window.addEventListener("userLogout", handleLogout)
+    window.addEventListener("sidebarToggle" as any, handleSidebarToggle as EventListener)
+
+    return () => {
+      window.removeEventListener("userLogout", handleLogout)
+      window.removeEventListener("sidebarToggle" as any, handleSidebarToggle as EventListener)
+    }
+  }, [router, isMounted])
+
+  useEffect(() => {
+    if (!isMounted || !user) return
+
+    const handlePopState = (event: PopStateEvent) => {
+      const stored = localStorage.getItem("user")
+      if (!stored) return
+      window.history.pushState(null, "", window.location.href)
+    }
+
+    window.history.pushState(null, "", window.location.href)
+    window.addEventListener("popstate", handlePopState)
+    return () => window.removeEventListener("popstate", handlePopState)
+  }, [user, isMounted])
+
+  if (!isMounted) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -61,15 +92,25 @@ export default function AdminLayout({
     )
   }
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Verifying session...</p>
+        </div>
+      </div>
+    )
+  }
+
   if (!user || user.role !== "admin") {
     return null
   }
 
-  // Transform user for Navbar component
-  const navbarUser = user
+  const navbarUser = user && user.name
     ? {
         name: user.name,
-        role: user.role,
+        role: user.role || "publisher",
         avatar: user.avatar || user.name
           .split(" ")
           .map((n) => n[0])
@@ -80,21 +121,18 @@ export default function AdminLayout({
     : undefined
 
   return (
-    <div className="flex min-h-screen bg-background overflow-x-hidden">
+    <div className="flex min-h-screen bg-background">
       <AdminSidebar />
       <div
         className={cn(
           "flex-1 flex flex-col transition-all duration-300 min-w-0",
-          isSidebarCollapsed ? "ml-16" : "ml-64"
+          isSidebarCollapsed ? "ml-20" : "ml-72"
         )}
       >
-        {/* Navbar positioned after sidebar - aligned with sidebar logo border */}
-        <div className="sticky top-0 z-30">
+        <div className="sticky top-0 z-30 bg-background">
           <Navbar user={navbarUser} hideLogo={true} />
         </div>
-
-        {/* Main content */}
-        <main className="flex-1 min-w-0 overflow-x-hidden">
+        <main className="flex-1 min-w-0 p-6 overflow-auto">
           {children}
         </main>
       </div>

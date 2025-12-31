@@ -76,7 +76,7 @@ export default function PublishPage() {
           // Always fetch from API to get the latest verification status
           if (user.email) {
             try {
-              const response = await fetch("http://localhost/repository-api/auth.php", {
+              const response = await fetch("http://localhost/repository-api/api/auth.php", {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
@@ -126,7 +126,7 @@ export default function PublishPage() {
     const loadDepartments = async () => {
       try {
         setIsLoadingDepartments(true)
-        const response = await fetch("http://localhost/repository-api/filters.php?operation=get_departments")
+          const response = await fetch("http://localhost/repository-api/api/filters.php?operation=get_departments")
         const result = await response.json()
         if (result.status === "success" && result.data) {
           setDepartments(result.data)
@@ -145,7 +145,7 @@ export default function PublishPage() {
     const loadResearchTypes = async () => {
       try {
         setIsLoadingResearchTypes(true)
-        const response = await fetch("http://localhost/repository-api/filters.php?operation=get_research_types")
+          const response = await fetch("http://localhost/repository-api/api/filters.php?operation=get_research_types")
         const result = await response.json()
         if (result.status === "success" && result.data) {
           setResearchTypes(result.data)
@@ -169,7 +169,7 @@ export default function PublishPage() {
           // Check if userId is missing and try to fetch it
           if (!userData.userId && !userData.user_id && userData.email) {
             // Try to get user ID from API
-            fetch("http://localhost/repository-api/auth.php", {
+            fetch("http://localhost/repository-api/api/auth.php", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -445,7 +445,7 @@ export default function PublishPage() {
       // If userId is missing, try to fetch it from the API using email
       if (!userId && user?.email) {
         try {
-          const response = await fetch("http://localhost/repository-api/auth.php", {
+          const response = await fetch("http://localhost/repository-api/api/auth.php", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -555,7 +555,7 @@ export default function PublishPage() {
           reject(new Error("Upload aborted"))
         })
 
-        xhr.open("POST", "http://localhost/repository-api/publisher.php")
+        xhr.open("POST", "http://localhost/repository-api/api/publisher.php")
         xhr.send(formDataToSend)
       })
 

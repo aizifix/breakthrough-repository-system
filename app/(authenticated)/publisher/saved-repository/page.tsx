@@ -2,13 +2,23 @@
 
 import { useState, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import RepositoryCard from "@/components/repository-card"
 import RepositoryViewModal from "@/components/repository-view-modal"
 import FilterPanel, { type FilterState } from "@/components/filter-panel"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Menu, Search, Bookmark, BookmarkCheck } from "lucide-react"
-import { getAllRepositories } from "@/app/config/api"
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
+import { Menu, Search, Bookmark, BookmarkCheck, ArrowLeft } from "lucide-react"
+import { getAllRepositories, getSavedRepositories } from "@/app/config/api"
+import RepositoryCardSkeleton from "@/components/repository-card-skeleton"
 
 // Static repositories from home page (for reference)
 const STATIC_REPOSITORIES = [
@@ -163,21 +173,15 @@ export default function SavedRepositoriesPage() {
           }
 
           try {
-            // Fetch repositories from API
+            // Fetch saved repositories from API
             // Get userId if user is logged in
             const userId = userData.userId || userData.user_id
-            const apiResponse = await getAllRepositories({
-              categories: [],
-              yearFrom: "",
-              yearTo: "",
-            }, userId)
+            const apiResponse = await getSavedRepositories(userId)
 
-            let apiRepos: Repository[] = []
+            let savedApiRepos: Repository[] = []
             if (apiResponse.status === "success" && apiResponse.data) {
               // Transform API response to match frontend format
-              // Filter to ONLY show published repositories (safety check)
-              apiRepos = apiResponse.data
-                .filter((repo: any) => repo.publishedStatus?.toLowerCase() === 'published')
+              savedApiRepos = apiResponse.data
                 .map((repo: any) => {
                   const avatar = repo.publisher_name
                     .split(" ")
@@ -200,60 +204,21 @@ export default function SavedRepositoriesPage() {
                     publishedDate: repo.publishedDate || new Date().toISOString().split("T")[0],
                     publishedStatus: repo.publishedStatus as "published" | "draft" | "unpublished",
                     pdfUrl: repo.pdfUrl || undefined,
-                  views: repo.views ?? 0,
-                  likes: repo.likes ?? 0,
-                  isLiked: repo.isLiked ?? false,
-                  rating: repo.rating ?? 0,
-                  ratingCount: repo.rating_count ?? 0,
-                }
-              })
+                    views: repo.views ?? 0,
+                    likes: repo.likes ?? 0,
+                    isLiked: repo.isLiked ?? false,
+                    rating: repo.rating ?? 0,
+                    ratingCount: repo.rating_count ?? 0,
+                  }
+                })
             }
 
-            // Load all repositories from localStorage and merge with static repositories
-            const storedRepos = localStorage.getItem("userRepositories")
-            const userRepos = storedRepos ? JSON.parse(storedRepos) : []
-            // Normalize repositories: convert tags to keywords if needed
-            const normalizedUserRepos = userRepos.map((repo: any) => ({
-              ...repo,
-              keywords: repo.keywords || repo.tags || [],
-            }))
-
-            // Merge all repositories: API repos, static repos, and localStorage repos
-            // Remove duplicates by ID (prioritize API repos, then localStorage, then static)
-            const repoMap = new Map<string, Repository>()
-
-            // First add static repositories
-            STATIC_REPOSITORIES.forEach((repo) => {
-              const normalized = {
-                ...repo,
-                keywords: repo.keywords || repo.tags || [],
-              }
-              repoMap.set(repo.id, normalized)
-            })
-
-            // Then add localStorage repositories (will overwrite static if same ID)
-            normalizedUserRepos.forEach((repo: any) => {
-              repoMap.set(repo.id, repo)
-            })
-
-            // Finally add API repos (will overwrite others if same ID)
-            apiRepos.forEach((repo) => {
-              repoMap.set(repo.id, repo)
-            })
-
-            const allRepos = Array.from(repoMap.values())
-            setAllRepositories(allRepos)
+            // Set only the saved repositories (not all repositories)
+            setAllRepositories(savedApiRepos)
           } catch (error) {
-            console.error("Error fetching repositories:", error)
-            // Fallback to just static and localStorage repos
-            const storedRepos = localStorage.getItem("userRepositories")
-            const userRepos = storedRepos ? JSON.parse(storedRepos) : []
-            const normalizedUserRepos = userRepos.map((repo: any) => ({
-              ...repo,
-              keywords: repo.keywords || repo.tags || [],
-            }))
-            const allRepos = [...STATIC_REPOSITORIES, ...normalizedUserRepos]
-            setAllRepositories(allRepos)
+            console.error("Error fetching saved repositories:", error)
+            // Fallback to empty array
+            setAllRepositories([])
           }
         } else {
           // No user found, redirect to login
@@ -292,21 +257,15 @@ export default function SavedRepositoriesPage() {
           }
 
           try {
-            // Fetch repositories from API
+            // Fetch saved repositories from API
             // Get userId if user is logged in
             const userId = userData.userId || userData.user_id
-            const apiResponse = await getAllRepositories({
-              categories: [],
-              yearFrom: "",
-              yearTo: "",
-            }, userId)
+            const apiResponse = await getSavedRepositories(userId)
 
-            let apiRepos: Repository[] = []
+            let savedApiRepos: Repository[] = []
             if (apiResponse.status === "success" && apiResponse.data) {
               // Transform API response to match frontend format
-              // Filter to ONLY show published repositories (safety check)
-              apiRepos = apiResponse.data
-                .filter((repo: any) => repo.publishedStatus?.toLowerCase() === 'published')
+              savedApiRepos = apiResponse.data
                 .map((repo: any) => {
                   const avatar = repo.publisher_name
                     .split(" ")
@@ -329,60 +288,21 @@ export default function SavedRepositoriesPage() {
                     publishedDate: repo.publishedDate || new Date().toISOString().split("T")[0],
                     publishedStatus: repo.publishedStatus as "published" | "draft" | "unpublished",
                     pdfUrl: repo.pdfUrl || undefined,
-                  views: repo.views ?? 0,
-                  likes: repo.likes ?? 0,
-                  isLiked: repo.isLiked ?? false,
-                  rating: repo.rating ?? 0,
-                  ratingCount: repo.rating_count ?? 0,
-                }
-              })
+                    views: repo.views ?? 0,
+                    likes: repo.likes ?? 0,
+                    isLiked: repo.isLiked ?? false,
+                    rating: repo.rating ?? 0,
+                    ratingCount: repo.rating_count ?? 0,
+                  }
+                })
             }
 
-            // Reload all repositories from localStorage and merge with static repositories
-            const storedRepos = localStorage.getItem("userRepositories")
-            const userRepos = storedRepos ? JSON.parse(storedRepos) : []
-            // Normalize repositories: convert tags to keywords if needed
-            const normalizedUserRepos = userRepos.map((repo: any) => ({
-              ...repo,
-              keywords: repo.keywords || repo.tags || [],
-            }))
-
-            // Merge all repositories: API repos, static repos, and localStorage repos
-            // Remove duplicates by ID (prioritize API repos, then localStorage, then static)
-            const repoMap = new Map<string, Repository>()
-
-            // First add static repositories
-            STATIC_REPOSITORIES.forEach((repo) => {
-              const normalized = {
-                ...repo,
-                keywords: repo.keywords || repo.tags || [],
-              }
-              repoMap.set(repo.id, normalized)
-            })
-
-            // Then add localStorage repositories (will overwrite static if same ID)
-            normalizedUserRepos.forEach((repo: any) => {
-              repoMap.set(repo.id, repo)
-            })
-
-            // Finally add API repos (will overwrite others if same ID)
-            apiRepos.forEach((repo) => {
-              repoMap.set(repo.id, repo)
-            })
-
-            const allRepos = Array.from(repoMap.values())
-            setAllRepositories(allRepos)
+            // Set only the saved repositories (not all repositories)
+            setAllRepositories(savedApiRepos)
           } catch (error) {
-            console.error("Error fetching repositories:", error)
-            // Fallback to just static and localStorage repos
-            const storedRepos = localStorage.getItem("userRepositories")
-            const userRepos = storedRepos ? JSON.parse(storedRepos) : []
-            const normalizedUserRepos = userRepos.map((repo: any) => ({
-              ...repo,
-              keywords: repo.keywords || repo.tags || [],
-            }))
-            const allRepos = [...STATIC_REPOSITORIES, ...normalizedUserRepos]
-            setAllRepositories(allRepos)
+            console.error("Error fetching saved repositories:", error)
+            // Fallback to empty array
+            setAllRepositories([])
           }
         }
       }
@@ -432,12 +352,45 @@ export default function SavedRepositoriesPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
+      <main className="min-h-screen bg-background">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="h-8 bg-muted rounded w-64 overflow-hidden relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent animate-[shimmer_2s_infinite]"></div>
+            </div>
+          </div>
+          <div className="flex flex-col lg:flex-row gap-6">
+            <aside className="hidden lg:block w-full lg:w-64 shrink-0">
+              <div className="border border-border rounded-lg p-6 bg-card space-y-6">
+                <div className="space-y-4">
+                  <div className="h-4 bg-muted rounded w-24 overflow-hidden relative">
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent animate-[shimmer_2s_infinite]"></div>
+                  </div>
+                  <div className="space-y-2">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-8 bg-muted rounded w-full overflow-hidden relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent animate-[shimmer_2s_infinite]" style={{ animationDelay: `${i * 100}ms` }}></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </aside>
+            <div className="flex-1 min-w-0">
+              <div className="mb-6">
+                <div className="h-4 bg-muted rounded w-64 overflow-hidden relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent animate-[shimmer_2s_infinite]"></div>
+                </div>
+              </div>
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                {[1, 2, 3, 4].map((i) => (
+                  <RepositoryCardSkeleton key={i} />
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </main>
     )
   }
 
@@ -448,6 +401,21 @@ export default function SavedRepositoriesPage() {
   return (
     <main className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Breadcrumbs */}
+        <Breadcrumb className="mb-4">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/publisher">Home</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Saved Repositories</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
         {/* Header Section */}
         <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>

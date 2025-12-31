@@ -75,7 +75,7 @@ export default function RepositorySocialFeatures({
         setIsLoading(true)
 
         // Load ratings
-        const ratingsResponse = await fetch("http://localhost/repository-api/publisher.php", {
+        const ratingsResponse = await fetch("http://localhost/repository-api/api/publisher.php", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -90,7 +90,7 @@ export default function RepositorySocialFeatures({
         }
 
         // Load likes
-        const likesResponse = await fetch("http://localhost/repository-api/publisher.php", {
+        const likesResponse = await fetch("http://localhost/repository-api/api/publisher.php", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -105,7 +105,7 @@ export default function RepositorySocialFeatures({
         }
 
         // Load comments
-        const commentsResponse = await fetch("http://localhost/repository-api/publisher.php", {
+        const commentsResponse = await fetch("http://localhost/repository-api/api/publisher.php", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -137,7 +137,7 @@ export default function RepositorySocialFeatures({
     }
 
     try {
-      const response = await fetch("http://localhost/repository-api/publisher.php", {
+      const response = await fetch("http://localhost/repository-api/api/publisher.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -168,7 +168,7 @@ export default function RepositorySocialFeatures({
     }
 
     try {
-      const response = await fetch("http://localhost/repository-api/publisher.php", {
+      const response = await fetch("http://localhost/repository-api/api/publisher.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -204,7 +204,7 @@ export default function RepositorySocialFeatures({
 
     setIsSubmitting(true)
     try {
-      const response = await fetch("http://localhost/repository-api/publisher.php", {
+      const response = await fetch("http://localhost/repository-api/api/publisher.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -237,7 +237,7 @@ export default function RepositorySocialFeatures({
     }
 
     try {
-      const response = await fetch("http://localhost/repository-api/publisher.php", {
+      const response = await fetch("http://localhost/repository-api/api/publisher.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

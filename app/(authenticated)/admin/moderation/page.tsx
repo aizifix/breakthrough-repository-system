@@ -2,10 +2,19 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
 import {
   Card,
   CardContent,
@@ -38,6 +47,7 @@ import {
   FileText,
   AlertCircle,
   MoreVertical,
+  ArrowLeft,
 } from "lucide-react"
 import {
   Dialog,
@@ -57,6 +67,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { getRepositoriesForModeration, approveRepository, rejectRepository } from "@/app/config/api"
+import { RepositoryTableSkeletonList } from "@/components/repository-table-skeleton"
 
 interface Repository {
   id: number | string
@@ -147,7 +158,7 @@ export default function ModerationPage() {
 
         setRepositories(formattedRepos)
       } else {
-        console.error("Failed to load repositories:", response.message)
+        console.error("Failed to load repositories:", response.message || "Unknown error")
         setRepositories([])
       }
     } catch (error) {
@@ -237,7 +248,7 @@ export default function ModerationPage() {
         setPublicationYear("")
         setModerationAction(null)
       } else {
-        alert(response.message || "Failed to moderate repository. Please try again.")
+        alert(response?.message || "Failed to moderate repository. Please try again.")
       }
     } catch (error) {
       console.error("Error moderating repository:", error)
@@ -304,6 +315,21 @@ export default function ModerationPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Breadcrumbs */}
+        <Breadcrumb className="mb-4">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/admin">Admin</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Content Moderation</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-4">
@@ -400,10 +426,7 @@ export default function ModerationPage() {
           </CardHeader>
           <CardContent className="p-0">
             {isLoading ? (
-              <div className="text-center py-12 px-6">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-sm text-muted-foreground">Loading repositories...</p>
-              </div>
+              <RepositoryTableSkeletonList count={8} />
             ) : filteredRepositories.length === 0 ? (
               <div className="text-center py-12 px-6">
                 <Shield className="mx-auto text-muted-foreground mb-4" size={48} />

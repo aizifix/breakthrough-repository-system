@@ -2,9 +2,18 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
 import {
   Card,
   CardContent,
@@ -45,6 +54,7 @@ import {
   Phone,
   MapPin,
   Fingerprint,
+  ArrowLeft,
 } from "lucide-react"
 import {
   Dialog,
@@ -64,6 +74,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { getUsers, updateUser, deleteUser, verifyUser } from "@/app/config/api"
+import { UserTableSkeletonList } from "@/components/user-table-skeleton"
 
 interface User {
   id: string
@@ -160,7 +171,7 @@ export default function UsersPage() {
 
         setUsers(formattedUsers)
       } else {
-        console.error("Failed to load users:", response.message)
+        console.error("Failed to load users:", response.message || "Unknown error")
         setUsers([])
       }
     } catch (error) {
@@ -270,7 +281,7 @@ export default function UsersPage() {
           await loadUsers()
           handleCloseDialog()
         } else {
-          alert(response.message || "Failed to update user. Please try again.")
+          alert(response?.message || "Failed to update user. Please try again.")
         }
       } else {
         // Note: Creating new users should be done through registration/auth endpoint
@@ -297,7 +308,7 @@ export default function UsersPage() {
           // Reload users to reflect changes
           await loadUsers()
         } else {
-          alert(response.message || "Failed to delete user. Please try again.")
+          alert(response?.message || "Failed to delete user. Please try again.")
         }
       } catch (error) {
         console.error("Error deleting user:", error)
@@ -320,7 +331,7 @@ export default function UsersPage() {
         // Optionally reload to get fresh data
         await loadUsers()
       } else {
-        alert(response.message || "Failed to update verification status. Please try again.")
+        alert(response?.message || "Failed to update verification status. Please try again.")
       }
     } catch (error) {
       console.error("Error updating verification:", error)
@@ -382,6 +393,21 @@ export default function UsersPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Breadcrumbs */}
+        <Breadcrumb className="mb-4">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/admin">Admin</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Users</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
@@ -498,10 +524,7 @@ export default function UsersPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-sm text-muted-foreground">Loading users...</p>
-              </div>
+              <UserTableSkeletonList count={8} />
             ) : filteredUsers.length === 0 ? (
               <div className="text-center py-12">
                 <Users className="mx-auto text-muted-foreground mb-4" size={48} />

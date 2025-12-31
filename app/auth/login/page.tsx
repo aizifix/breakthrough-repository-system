@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Mail, Lock, ArrowRight, RefreshCw, Quote, ArrowLeft } from "lucide-react"
+import { Mail, Lock, ArrowRight, RefreshCw, ArrowLeft } from "lucide-react"
 import { login } from "@/app/config/api"
 
 export default function LoginPage() {
@@ -115,12 +115,14 @@ export default function LoginPage() {
         localStorage.setItem("user", JSON.stringify(user))
         localStorage.setItem(`userProfile_${userData.user_email}`, JSON.stringify(extendedProfile))
 
-        // Redirect based on role (default to publisher)
+        // Redirect based on role (default to publisher) - use replace to prevent back navigation
         const userRole = userData.user_role || "publisher"
         if (userRole === "admin") {
-          router.push("/admin/dashboard")
+          window.history.replaceState(null, "", "/admin/dashboard")
+          router.replace("/admin/dashboard")
         } else {
-          router.push("/publisher")
+          window.history.replaceState(null, "", "/publisher")
+          router.replace("/publisher")
         }
       } else {
         setError(result.message || "Login failed. Please try again.")
@@ -200,7 +202,6 @@ export default function LoginPage() {
         {/* Quote Section */}
         <div className="relative z-10 mt-auto">
           <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
-            <Quote className="w-8 h-8 text-white/80 mb-4" />
             <p className="text-white text-lg italic leading-relaxed mb-4">
               "Knowledge shared is knowledge multiplied. Breakthrough makes it possible for researchers to connect, collaborate, and create impact."
             </p>

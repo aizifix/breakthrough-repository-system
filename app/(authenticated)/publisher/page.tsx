@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Menu, Search, Plus } from "lucide-react"
 import { getAllRepositories } from "@/app/config/api"
+import RepositoryCardSkeleton from "@/components/repository-card-skeleton"
 
 interface Repository {
   id: string
@@ -17,14 +18,21 @@ interface Repository {
   publisher: {
     name: string
     avatar: string
+    isVerified?: boolean
   }
   category: string[]
   keywords: string[]
+  tags: string[]
   publishedDate: string | null
   publishedStatus: "published" | "draft" | "unpublished" | "pending" | "rejected"
   pdfUrl?: string
   pdfData?: string
   userId?: string
+  views?: number
+  likes?: number
+  isLiked?: boolean
+  rating?: number
+  ratingCount?: number
 }
 
 export default function PublisherHomePage() {
@@ -66,16 +74,34 @@ export default function PublisherHomePage() {
         setIsLoading(true)
         // Get userId if user is logged in
         const userId = user ? ((user as any).userId || (user as any).user_id) : undefined
+        console.log("Making API call with filters:", {
+          categories: filters.departments || [],
+          keywords: filters.keywords || '',
+          yearFrom: filters.yearFrom,
+          yearTo: filters.yearTo,
+        }, "and userId:", userId);
+
         const response = await getAllRepositories({
+          categories: filters.departments || [],
+          keywords: filters.keywords || '',
           yearFrom: filters.yearFrom,
           yearTo: filters.yearTo,
         }, userId)
 
+        console.log("API response:", response);
+
         if (response.status === "success" && response.data) {
+          console.log("API returned", response.data.length, "repositories");
           // Transform API response to match frontend format
           // Filter to ONLY show published repositories (safety check)
           const transformedRepos: Repository[] = response.data
-            .filter((repo: any) => repo.publishedStatus?.toLowerCase() === 'published')
+            .filter((repo: any) => {
+              const isPublished = repo.publishedStatus?.toLowerCase() === 'published';
+              if (!isPublished) {
+                console.log("Filtered out repo with status:", repo.publishedStatus, "ID:", repo.id);
+              }
+              return isPublished;
+            })
             .map((repo: any) => {
               // Generate avatar from publisher name
               const avatar = repo.publisher_name
@@ -96,6 +122,7 @@ export default function PublisherHomePage() {
                 },
                 category: Array.isArray(repo.category) ? repo.category : [],
                 keywords: Array.isArray(repo.tags) ? repo.tags : [],
+                tags: Array.isArray(repo.tags) ? repo.tags : [],
                 publishedDate: repo.publishedDate || null,
                 publishedStatus: repo.publishedStatus as "published",
                 pdfUrl: repo.pdfUrl || undefined,
@@ -106,12 +133,15 @@ export default function PublisherHomePage() {
                 ratingCount: repo.rating_count ?? 0,
               }
             })
+          console.log("After transformation, we have", transformedRepos.length, "published repositories");
           setAllRepositories(transformedRepos)
         } else {
+          console.error("API returned error or no data:", response);
           setAllRepositories([])
         }
       } catch (error) {
         console.error("Error fetching repositories:", error)
+        // Show error toasts or better error handling
         setAllRepositories([])
       } finally {
         setIsLoading(false)
@@ -230,9 +260,10 @@ export default function PublisherHomePage() {
 
             {/* Repository Grid */}
             {isLoading ? (
-              <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-muted-foreground">Loading repositories...</p>
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                {[1, 2, 3, 4].map((i) => (
+                  <RepositoryCardSkeleton key={i} />
+                ))}
               </div>
             ) : filteredRepositories.length > 0 ? (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">

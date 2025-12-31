@@ -48,6 +48,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { getAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement } from "@/app/config/api"
+import { AnnouncementTableSkeletonList } from "@/components/announcement-card-skeleton"
 
 interface Announcement {
   id: number | string
@@ -174,10 +175,9 @@ export default function AnnouncementsPage() {
           await loadAnnouncements()
           handleCloseDialog()
         } else {
-          alert(response.message || "Failed to update announcement. Please try again.")
+          alert(response?.message || "Failed to update announcement. Please try again.")
         }
       } else {
-        // Create new announcement
         const response = await createAnnouncement({
           title: formData.title.trim(),
           content: formData.content.trim(),
@@ -188,7 +188,7 @@ export default function AnnouncementsPage() {
           await loadAnnouncements()
           handleCloseDialog()
         } else {
-          alert(response.message || "Failed to create announcement. Please try again.")
+          alert(response?.message || "Failed to create announcement. Please try again.")
         }
       }
     } catch (error) {
@@ -206,7 +206,7 @@ export default function AnnouncementsPage() {
         if (response.status === "success") {
           await loadAnnouncements()
         } else {
-          alert(response.message || "Failed to delete announcement. Please try again.")
+          alert(response?.message || "Failed to delete announcement. Please try again.")
         }
       } catch (error) {
         console.error("Error deleting announcement:", error)
@@ -228,7 +228,7 @@ export default function AnnouncementsPage() {
       if (response.status === "success") {
         await loadAnnouncements()
       } else {
-        alert(response.message || "Failed to update announcement. Please try again.")
+        alert(response?.message || "Failed to update announcement. Please try again.")
       }
     } catch (error) {
       console.error("Error toggling publish:", error)
@@ -363,12 +363,9 @@ export default function AnnouncementsPage() {
                   </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
-                        <p className="text-muted-foreground mt-2">Loading announcements...</p>
-                      </TableCell>
-                    </TableRow>
+                    <>
+                      <AnnouncementTableSkeletonList count={5} />
+                    </>
                   ) : announcements.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center py-8">

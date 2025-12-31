@@ -100,18 +100,18 @@ CREATE TABLE `tbl_repository` (
 --
 
 INSERT INTO `tbl_repository` (`id`, `title`, `abstract`, `publisher`, `category`, `tags`, `publishedDate`, `publishedStatus`, `pdfUrl`, `created_at`, `updated_at`) VALUES
-(9, 'sdfsdf', 'sdfsdfsd', 1, 'Machine Learning, Engineering', 'asd, iop4', NULL, 'pending', '/uploads/repository/repo_6910231d23c4a4.76456433_1762665245.pdf', '2025-11-09 05:14:05', '2025-11-09 05:14:05'),
-(10, 'fsdfsdfsdf', 'sdfsdfsd', 1, 'Artificial Intelligence, Engineering', 'fsdfsdfsdf', NULL, 'pending', '/uploads/repository/Learners Ville Childhood Monitoring System.pdf', '2025-11-09 05:16:25', '2025-11-09 05:16:25'),
-(11, 'sdfsd', 'fsdfsd', 1, 'Machine Learning, Engineering', 'sdfsdfsd', NULL, 'pending', '/uploads/repository/Learners Ville Childhood Monitoring System_1.pdf', '2025-11-09 05:20:11', '2025-11-09 05:20:11'),
-(12, 'sdfsdf', 'sdfsdf', 1, 'Artificial Intelligence, Engineering', 'sdfsfsdfsd', NULL, 'pending', '/uploads/repository/Learners Ville Childhood Monitoring System.pdf', '2025-11-09 05:22:27', '2025-11-09 05:22:27'),
-(13, 'sdfsd', 'fsdfsdf', 1, 'Artificial Intelligence, Engineering', 'asdasdf', NULL, 'pending', '/uploads/repository/Learners Ville Childhood Monitoring System_1.pdf', '2025-11-09 05:25:26', '2025-11-09 05:25:26'),
-(14, 'sdfsdf', 'sdfsdf', 1, 'Engineering, Nanotechnology', 'sdfsdfsd\\', NULL, 'pending', '/uploads/repository/Learners Ville Childhood Monitoring System_2.pdf', '2025-11-09 05:30:09', '2025-11-09 05:30:09'),
-(15, 'SDFG', 'DFG', 1, 'Artificial Intelligence, Engineering, Machine Learning', 'DFGDF', NULL, 'pending', '/uploads/repository/Learners Ville Childhood Monitoring System_3.pdf', '2025-11-09 05:34:16', '2025-11-09 05:34:16'),
-(16, 'sdf', 'sdf', 1, 'Artificial Intelligence, Engineering', 'sdfsd', NULL, 'pending', '/uploads/repository/Learners Ville Childhood Monitoring System_4.pdf', '2025-11-09 05:46:30', '2025-11-09 05:46:30'),
-(17, 'sdg', 'dfgdf', 1, 'Engineering, Quantum Computing', 'dfgdfg', NULL, 'pending', '/uploads/repository/Learners Ville Childhood Monitoring System_5.pdf', '2025-11-09 05:49:38', '2025-11-09 05:49:38'),
-(18, 'sdfsdfsd', 'sdfsdfsdf', 1, 'Nanotechnology, Climate Science', 'sdfsdf', NULL, 'pending', '/uploads/repository/Learners Ville Childhood Monitoring System_6.pdf', '2025-11-09 05:58:04', '2025-11-09 05:58:04'),
-(19, 'New Learners VIlle System', 'This is the sample abstract section', 1, 'Biotechnology, Machine Learning', 'Test tr', NULL, 'pending', '/uploads/repository/Learners Ville Childhood Monitoring System_7.pdf', '2025-11-09 06:00:07', '2025-11-09 06:00:07'),
-(20, 'dddd', 'dddd', 1, 'Artificial Intelligence, Nanotechnology', 'dsd', NULL, 'pending', '/uploads/repository/Deep Learning for Medical Image Analysis_ A Comprehensive Survey (1).pdf', '2025-11-09 06:03:42', '2025-11-09 06:03:42');
+(9, 'sdfsdf', 'sdfsdfsd', 1, 'Machine Learning, Engineering', 'asd, iop4', NULL, 'published', '/uploads/repository/repo_6910231d23c4a4.76456433_1762665245.pdf', '2025-11-09 05:14:05', '2025-11-09 05:14:05'),
+(10, 'fsdfsdfsdf', 'sdfsdfsd', 1, 'Artificial Intelligence, Engineering', 'fsdfsdfsdf', NULL, 'published', '/uploads/repository/Learners Ville Childhood Monitoring System.pdf', '2025-11-09 05:16:25', '2025-11-09 05:16:25'),
+(11, 'sdfsd', 'fsdfsd', 1, 'Machine Learning, Engineering', 'sdfsdfsd', NULL, 'published', '/uploads/repository/Learners Ville Childhood Monitoring System_1.pdf', '2025-11-09 05:20:11', '2025-11-09 05:20:11'),
+(12, 'sdfsdf', 'sdfsdf', 1, 'Artificial Intelligence, Engineering', 'sdfsfsdfsd', NULL, 'published', '/uploads/repository/Learners Ville Childhood Monitoring System.pdf', '2025-11-09 05:22:27', '2025-11-09 05:22:27'),
+(13, 'sdfsd', 'fsdfsdf', 1, 'Artificial Intelligence, Engineering', 'asdasdf', NULL, 'published', '/uploads/repository/Learners Ville Childhood Monitoring System_1.pdf', '2025-11-09 05:25:26', '2025-11-09 05:25:26'),
+(14, 'sdfsdf', 'sdfsdf', 1, 'Engineering, Nanotechnology', 'sdfsdfsd\\', NULL, 'published', '/uploads/repository/Learners Ville Childhood Monitoring System_2.pdf', '2025-11-09 05:30:09', '2025-11-09 05:30:09'),
+(15, 'SDFG', 'DFG', 1, 'Artificial Intelligence, Engineering, Machine Learning', 'DFGDF', NULL, 'published', '/uploads/repository/Learners Ville Childhood Monitoring System_3.pdf', '2025-11-09 05:34:16', '2025-11-09 05:34:16'),
+(16, 'sdf', 'sdf', 1, 'Artificial Intelligence, Engineering', 'sdfsd', NULL, 'published', '/uploads/repository/Learners Ville Childhood Monitoring System_4.pdf', '2025-11-09 05:46:30', '2025-11-09 05:46:30'),
+(17, 'sdg', 'dfgdf', 1, 'Engineering, Quantum Computing', 'dfgdfg', NULL, 'published', '/uploads/repository/Learners Ville Childhood Monitoring System_5.pdf', '2025-11-09 05:49:38', '2025-11-09 05:49:38'),
+(18, 'sdfsdfsd', 'sdfsdfsdf', 1, 'Nanotechnology, Climate Science', 'sdfsdf', NULL, 'published', '/uploads/repository/Learners Ville Childhood Monitoring System_6.pdf', '2025-11-09 05:58:04', '2025-11-09 05:58:04'),
+(19, 'New Learners VIlle System', 'This is the sample abstract section', 1, 'Biotechnology, Machine Learning', 'Test tr', NULL, 'published', '/uploads/repository/Learners Ville Childhood Monitoring System_7.pdf', '2025-11-09 06:00:07', '2025-11-09 06:00:07'),
+(20, 'dddd', 'dddd', 1, 'Artificial Intelligence, Nanotechnology', 'dsd', NULL, 'published', '/uploads/repository/Deep Learning for Medical Image Analysis_ A Comprehensive Survey (1).pdf', '2025-11-09 06:03:42', '2025-11-09 06:03:42');
 
 -- --------------------------------------------------------
 

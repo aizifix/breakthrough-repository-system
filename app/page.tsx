@@ -38,16 +38,68 @@ interface Announcement {
   createdBy: string
 }
 
+interface Repository {
+  id: string
+  title: string
+  abstract: string
+  publisher: {
+    name: string
+    avatar: string
+  }
+  category: string[]
+  tags: string[]
+  publishedDate: string | null
+  publishedStatus: "published" | "draft" | "unpublished" | "pending" | "rejected"
+  pdfUrl?: string
+}
+
+interface Announcement {
+  id: string
+  title: string
+  content: string
+  published: boolean
+  createdAt: string
+  updatedAt: string
+  createdBy: string
+}
+
 export default function HomePage() {
   const router = useRouter()
   const [user, setUser] = useState<{ name: string; email: string; role?: string } | null>(null)
   const [repositories, setRepositories] = useState<Repository[]>([])
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingAnnouncements, setIsLoadingAnnouncements] = useState(true)
   const [selectedRepository, setSelectedRepository] = useState<Repository | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [displayLimit, setDisplayLimit] = useState(6) // Initial display limit for homepage
-  const ITEMS_PER_PAGE = 6 // Items to show per "see more" click
+  const [displayLimit, setDisplayLimit] = useState(6)
+  const ITEMS_PER_PAGE = 6
+  const [heroVisible, setHeroVisible] = useState(false)
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible')
+          }
+        })
+      },
+      { threshold: 0.1, rootMargin: '0px 0px -50px 0px' }
+    )
+
+    document.querySelectorAll('.scroll-reveal').forEach((el) => {
+      observer.observe(el)
+    })
+
+    setHeroVisible(true)
+
+    return () => {
+      document.querySelectorAll('.scroll-reveal').forEach((el) => {
+        observer.unobserve(el)
+      })
+    }
+  }, [])
 
   // Load user from localStorage on mount and listen for changes
   useEffect(() => {
@@ -112,11 +164,23 @@ export default function HomePage() {
     }
   }, [router])
 
+  // Debug: Log announcements state changes
+  useEffect(() => {
+    console.log("Announcements state updated:", announcements.length, "announcements")
+    if (announcements.length > 0) {
+      console.log("First announcement:", announcements[0])
+    }
+  }, [announcements])
+
   // Load announcements from API
   useEffect(() => {
     const fetchAnnouncements = async () => {
       try {
+        setIsLoadingAnnouncements(true)
+        console.log("Fetching announcements...")
         const response = await getAnnouncements(true) // Only published
+        console.log("Announcements response:", response)
+        
         if (response.status === "success" && response.data) {
           // Sort by date, newest first, and take latest 3
           const sorted = response.data
@@ -134,10 +198,16 @@ export default function HomePage() {
               createdBy: ann.created_by_name || ann.createdBy || "Admin",
             }))
           setAnnouncements(sorted)
+          console.log("Announcements loaded:", sorted.length)
+        } else {
+          console.log("No announcements data or error:", response.message)
+          setAnnouncements([])
         }
       } catch (error) {
         console.error("Error fetching announcements:", error)
         setAnnouncements([])
+      } finally {
+        setIsLoadingAnnouncements(false)
       }
     }
     fetchAnnouncements()
@@ -236,20 +306,21 @@ export default function HomePage() {
     <main className="min-h-screen bg-background">
       <Navbar user={navbarUser} />
 
-      {/* Hero Section */}
-      <section className="relative bg-linear-to-br from-primary/20 via-primary/10 to-accent/10 border-b border-border overflow-hidden">
-        <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
+      <section className="relative bg-gradient-to-br from-primary/10 via-primary/5 to-accent/10 border-b border-border overflow-hidden">
+        <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
+        <div className="absolute top-20 left-20 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-float"></div>
+        <div className="absolute bottom-20 right-20 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }}></div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28">
           <div className="text-center max-w-4xl mx-auto">
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-foreground mb-6 tracking-tight">
+            <h1 className={`text-5xl md:text-6xl lg:text-7xl font-bold text-foreground mb-6 tracking-tight transition-all duration-1000 ${heroVisible ? 'animate-fade-in-up' : 'opacity-0'}`}>
               Breakthrough Research
-              <span className="block text-primary mt-2">Repository</span>
+              <span className="block text-primary mt-2 bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent animate-gradient">Repository</span>
             </h1>
-            <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
+            <p className={`text-xl md:text-2xl text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed transition-all duration-1000 ${heroVisible ? 'animate-fade-in-up animation-delay-200' : 'opacity-0'}`}>
               Discover, share, and collaborate on cutting-edge research across multiple disciplines.
               Join a global community of researchers and scholars.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className={`flex flex-col sm:flex-row gap-4 justify-center transition-all duration-1000 ${heroVisible ? 'animate-fade-in-up animation-delay-400' : 'opacity-0'}`}>
               <Link href="/repositories">
                 <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 text-lg px-8 py-6">
                   <Search className="mr-2 h-5 w-5" />
@@ -269,10 +340,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Announcements Section */}
       <section className="py-20 px-4 bg-background">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12">
+          <div className="text-center mb-12 scroll-reveal">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-4">
               <FileText className="h-8 w-8 text-primary" />
             </div>
@@ -282,10 +352,32 @@ export default function HomePage() {
             </p>
           </div>
 
-          {announcements.length > 0 ? (
+          {isLoadingAnnouncements ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {announcements.map((announcement) => (
-                <Card key={announcement.id} className="border-border hover:shadow-lg transition-shadow">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="border-border">
+                  <CardHeader>
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="h-5 bg-muted rounded w-24 animate-pulse"></div>
+                    </div>
+                    <div className="h-6 bg-muted rounded w-full overflow-hidden relative">
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent animate-[shimmer_2s_infinite]"></div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="h-4 bg-muted rounded w-full animate-pulse"></div>
+                      <div className="h-4 bg-muted rounded w-5/6 animate-pulse"></div>
+                      <div className="h-4 bg-muted rounded w-4/6 animate-pulse"></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : announcements.length > 0 ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {announcements.map((announcement, index) => (
+                <Card key={announcement.id} className="border-border hover:shadow-lg transition-all duration-300">
                   <CardHeader>
                     <div className="flex items-start justify-between mb-2">
                       <Badge variant="secondary" className="text-xs">
@@ -309,16 +401,15 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Featured Repositories Section */}
       <section className="py-20 px-4 bg-muted/30">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-12">
-            <div>
+            <div className="scroll-reveal">
               <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4">Repositories</h2>
               <p className="text-xl text-muted-foreground">Dive into the latest research publications from our community</p>
             </div>
-            <Link href="/repositories">
-              <Button variant="outline" className="hidden md:flex">
+            <Link href="/repositories" className="hidden md:flex">
+              <Button variant="outline">
                 View All
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
@@ -348,9 +439,8 @@ export default function HomePage() {
                 ))}
               </div>
 
-              {/* See More / See Less Buttons */}
               {repositories.length > 6 && (
-                <div className="flex justify-center gap-4">
+                <div className="flex justify-center gap-4 scroll-reveal">
                   {displayLimit < repositories.length ? (
                     <Button
                       onClick={() => setDisplayLimit((prev) => Math.min(prev + ITEMS_PER_PAGE, repositories.length))}
@@ -384,7 +474,7 @@ export default function HomePage() {
               )}
             </>
           ) : (
-            <div className="text-center py-12">
+            <div className="text-center py-12 scroll-reveal">
               <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
               <p className="text-lg text-muted-foreground mb-2">No repositories available yet</p>
               <p className="text-sm text-muted-foreground">Check back soon for new publications</p>
@@ -393,10 +483,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* About Section */}
       <section className="py-20 px-4 bg-background">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
+          <div className="text-center mb-16 scroll-reveal">
             <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4">About Breakthrough</h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
               A comprehensive platform designed to revolutionize how research is shared, discovered, and accessed
@@ -404,85 +493,39 @@ export default function HomePage() {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <Card className="border-border hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                  <FileText className="h-6 w-6 text-primary" />
-                </div>
-                <CardTitle className="text-2xl">Rich Repository</CardTitle>
-                <CardDescription className="text-base">
-                  Access thousands of peer-reviewed research publications across diverse disciplines
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="border-border hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                  <User className="h-6 w-6 text-primary" />
-                </div>
-                <CardTitle className="text-2xl">Global Community</CardTitle>
-                <CardDescription className="text-base">
-                  Connect with researchers, scholars, and academics from around the world
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="border-border hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                  <Search className="h-6 w-6 text-primary" />
-                </div>
-                <CardTitle className="text-2xl">Powerful Discovery</CardTitle>
-                <CardDescription className="text-base">
-                  Advanced filtering and search capabilities to surface the work you need faster
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="border-border hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                  <CheckCircle2 className="h-6 w-6 text-primary" />
-                </div>
-                <CardTitle className="text-2xl">Quality First</CardTitle>
-                <CardDescription className="text-base">
-                  Every submission is reviewed to maintain academic integrity and relevance
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="border-border hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                  <Plus className="h-6 w-6 text-primary" />
-                </div>
-                <CardTitle className="text-2xl">Publish Easily</CardTitle>
-                <CardDescription className="text-base">
-                  A streamlined publishing workflow built for busy researchers and advisors
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="border-border hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                  <FileText className="h-6 w-6 text-primary" />
-                </div>
-                <CardTitle className="text-2xl">Open & Accessible</CardTitle>
-                <CardDescription className="text-base">
-                  Share knowledge broadly with open access downloads and sharable repository links
-                </CardDescription>
-              </CardHeader>
-            </Card>
+            {[
+              { icon: FileText, title: "Rich Repository", description: "Access thousands of peer-reviewed research publications across diverse disciplines" },
+              { icon: User, title: "Global Community", description: "Connect with researchers, scholars, and academics from around the world" },
+              { icon: Search, title: "Powerful Discovery", description: "Advanced filtering and search capabilities to surface the work you need faster" },
+              { icon: CheckCircle2, title: "Quality First", description: "Every submission is reviewed to maintain academic integrity and relevance" },
+              { icon: Plus, title: "Publish Easily", description: "A streamlined publishing workflow built for busy researchers and advisors" },
+              { icon: FileText, title: "Open & Accessible", description: "Share knowledge broadly with open access downloads and sharable repository links" },
+            ].map((item, index) => (
+              <Card
+                key={index}
+                className="border-border hover:shadow-lg transition-all duration-300 scroll-reveal"
+                style={{ transitionDelay: `${index * 100}ms` }}
+              >
+                <CardHeader>
+                  <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
+                    <item.icon className="h-6 w-6 text-primary" />
+                  </div>
+                  <CardTitle className="text-2xl">{item.title}</CardTitle>
+                  <CardDescription className="text-base">
+                    {item.description}
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
       {!user && (
-        <section className="py-20 px-4 bg-linear-to-r from-primary/10 to-accent/10 border-t border-border">
-          <div className="max-w-4xl mx-auto text-center">
+        <section className="py-20 px-4 bg-gradient-to-r from-primary/10 to-accent/10 border-t border-border relative overflow-hidden">
+          <div className="absolute top-0 left-1/4 w-64 h-64 bg-primary/10 rounded-full blur-3xl animate-float"></div>
+          <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-accent/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '3s' }}></div>
+          <div className="relative max-w-4xl mx-auto text-center scroll-reveal">
             <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">
               Ready to Get Started?
             </h2>

@@ -182,7 +182,7 @@ export default function RepositoryCard({
     }
 
     try {
-      const response = await fetch("http://localhost/repository-api/publisher.php", {
+      const response = await fetch("http://localhost/repository-api/api/publisher.php", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

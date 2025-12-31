@@ -10,7 +10,7 @@ export default function AuthenticatedLayout({
 }: {
   children: React.ReactNode
 }) {
-  const [user, setUser] = useState<{ name: string; email: string; role?: string; avatar?: string } | null>(null)
+  const [user, setUser] = useState<{ name?: string; email: string; role?: string; avatar?: string } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
   const pathname = usePathname()
@@ -40,9 +40,8 @@ export default function AuthenticatedLayout({
         if (e.key === "user") {
           const stored = localStorage.getItem("user")
           if (!stored) {
-            // User logged out, redirect to home and prevent back navigation
-            window.history.replaceState(null, "", "/")
-            router.replace("/")
+            window.history.replaceState(null, "", "/auth/login")
+            router.replace("/auth/login")
             setUser(null)
           } else {
             loadUser()
@@ -54,9 +53,8 @@ export default function AuthenticatedLayout({
       const handleLogout = () => {
         const stored = localStorage.getItem("user")
         if (!stored) {
-          // User logged out, redirect to home and prevent back navigation
-          window.history.replaceState(null, "", "/")
-          router.replace("/")
+          window.history.replaceState(null, "", "/auth/login")
+          router.replace("/auth/login")
           setUser(null)
         } else {
           loadUser()
@@ -74,7 +72,7 @@ export default function AuthenticatedLayout({
   }, [router])
 
   // Transform user for Navbar component
-  const navbarUser = user
+  const navbarUser = user && user.name
     ? {
         name: user.name,
         role: user.role,

@@ -41,6 +41,25 @@ declare module 'lucide-react' {
   export const CreditCard: FC<IconProps>
   export const Image: FC<IconProps>
   export const MoreVertical: FC<IconProps>
+  export const Settings: FC<IconProps>
+  export const LogOut: FC<IconProps>
+  export const LogIn: FC<IconProps>
+  export const FolderOpen: FC<IconProps>
+  export const Bell: FC<IconProps>
+  export const Clock: FC<IconProps>
+  export const Home: FC<IconProps>
+  export const Users: FC<IconProps>
+  export const FileBarChart: FC<IconProps>
+  export const BarChart: FC<IconProps>
+  export const Megaphone: FC<IconProps>
+  export const LayoutDashboard: FC<IconProps>
+  export const ShieldCheck: FC<IconProps>
+  export const ChevronLeft: FC<IconProps>
+  export const ChevronRight: FC<IconProps>
+  export const Crown: FC<IconProps>
+  export const User: FC<IconProps>
+  export const TrendingUp: FC<IconProps>
+  export const BookOpen: FC<IconProps>
 
   // Type for any icon component
   type LucideIcon = FC<IconProps>

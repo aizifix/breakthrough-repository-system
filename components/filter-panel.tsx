@@ -53,7 +53,7 @@ export default function FilterPanel({ onFilterChange, onSearch, isOpen, onClose 
   useEffect(() => {
     const loadFilters = async () => {
       try {
-        const response = await fetch("http://localhost/repository-api/filters.php?operation=get_all_filters")
+        const response = await fetch("http://localhost/repository-api/api/filters.php?operation=get_all_filters")
         const result = await response.json()
         if (result.status === "success") {
           setDepartments(result.data.departments || [])

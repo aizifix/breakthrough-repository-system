@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, Menu, Search, FileText } from "lucide-react"
 import { getPublisherRepositories } from "@/app/config/api"
+import RepositoryCardSkeleton from "@/components/repository-card-skeleton"
 
 interface Repository {
   id: number | string
@@ -29,6 +30,11 @@ interface Repository {
   publisher_name?: string
   publisher_email?: string
   created_at?: string
+  views?: number
+  likes?: number
+  isLiked?: boolean
+  rating?: number
+  ratingCount?: number
 }
 
 export default function MyRepositoriesPage() {
@@ -55,63 +61,79 @@ export default function MyRepositoriesPage() {
         const stored = localStorage.getItem("user")
         if (stored) {
           try {
+            console.log("=== FRONTEND DEBUG: Checking user ===")
             const userData = JSON.parse(stored)
+            console.log("Raw userData from localStorage:", userData)
+            
             setUser(userData)
 
-            // Fetch repositories from API
-            // Check for userId (from login) or user_id (from API)
-            const userId = userData.userId || userData.user_id
+            // Fetch repositories from API - try both userId and user_id
+            let userId = userData.userId || userData.user_id
+            console.log("Extracted userId:", userId, "Type:", typeof userId)
+            
+            // If still undefined, try parsing from different formats
+            if (!userId) {
+              console.warn("userId is undefined, checking alternative formats...")
+              if (userData.data && userData.data.user_id) {
+                userId = userData.data.user_id
+              }
+              if (typeof userId === 'string' && userId.trim() !== '') {
+                userId = parseInt(userId, 10)
+                console.log("Converted string userId to:", userId, "Type:", typeof userId)
+              }
+            }
 
-             if (userId) {
+            // Force userId to be a number
+            userId = Number(userId)
+            console.log("Final userId:", userId, "Is NaN:", isNaN(userId))
+
+             if (userId && !isNaN(userId)) {
                try {
-                 const response = await getPublisherRepositories(userId, userId)
+                 const response = await getPublisherRepositories(userId)
 
-                 if (response.status === "success" && response.data) {
-                  // Format repositories to match expected structure
-                  const formattedRepos = response.data.map((repo: any) => ({
-                    ...repo,
-                    id: repo.id.toString(), // Ensure id is string for RepositoryCard
-                    publisherId: repo.publisher, // Preserve original publisher ID
-                    publisher: {
-                      name: repo.publisher_name || "Unknown",
-                      avatar: (repo.publisher_name || "U")
-                        .split(" ")
-                        .map((n: string) => n[0])
-                        .join("")
-                        .toUpperCase()
-                        .slice(0, 2),
-                      isVerified: repo.publisher_is_verified ?? false,
-                    },
-                    // Ensure category and keywords are arrays
-                    category: Array.isArray(repo.category) ? repo.category : (repo.category ? [repo.category] : []),
-                    keywords: Array.isArray(repo.tags) ? repo.tags : (repo.tags ? [repo.tags] : []),
-                    views: repo.views ?? 0,
-                    likes: repo.likes ?? 0,
-                    isLiked: repo.isLiked ?? false,
-                    rating: repo.rating ?? 0,
-                    ratingCount: repo.rating_count ?? 0,
-                  }))
+                 if (response.status === "success" && response.data && Array.isArray(response.data)) {
+                   const formattedRepos = response.data.map((repo: any) => ({
+                     ...repo,
+                     id: String(repo.id),
+                     publisherId: repo.publisher,
+                     publisher: {
+                       name: repo.publisher_name || "Unknown",
+                       avatar: (repo.publisher_name || "U")
+                         .split(" ")
+                         .map((n: string) => n[0])
+                         .join("")
+                         .toUpperCase()
+                         .slice(0, 2),
+                       isVerified: repo.publisher_is_verified ?? false,
+                     },
+                     category: Array.isArray(repo.category) ? repo.category : (repo.category ? [repo.category] : []),
+                     keywords: Array.isArray(repo.tags) ? repo.tags : (repo.tags ? [repo.tags] : []),
+                     views: repo.views ?? 0,
+                     likes: repo.likes ?? 0,
+                     isLiked: repo.isLiked ?? false,
+                     rating: repo.rating ?? 0,
+                     ratingCount: repo.rating_count ?? 0,
+                   }))
                    setRepositories(formattedRepos)
                  } else {
+                   console.warn("API returned no data or error status:", response)
                    setRepositories([])
-                   if (response.message) {
-                     console.error("API Error:", response.message)
-                   }
                  }
                } catch (error: any) {
                  console.error("Error fetching repositories:", error)
                  setRepositories([])
-                 if (error.response) {
-                   console.error("Response error:", error.response.data)
-                 } else if (error.request) {
-                   console.error("Request error:", error.request)
-                 }
                }
-             }
+              } else {
+                console.error("Invalid userId:", userId)
+                setRepositories([])
+              }
           } catch (e) {
+            console.error("=== FRONTEND DEBUG: JSON Parse Error ===")
+            console.error("Error:", e)
             router.push("/auth/login")
           }
         } else {
+          console.error("=== FRONTEND DEBUG: No user in localStorage ===")
           router.push("/auth/login")
         }
         setIsLoading(false)
@@ -207,12 +229,48 @@ export default function MyRepositoriesPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
+      <main className="min-h-screen bg-background">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="h-8 bg-muted rounded w-48 overflow-hidden relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent animate-[shimmer_2s_infinite]"></div>
+            </div>
+            <div className="h-10 bg-muted rounded w-32 overflow-hidden relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent animate-[shimmer_2s_infinite]"></div>
+            </div>
+          </div>
+          <div className="flex flex-col lg:flex-row gap-6">
+            <aside className="hidden lg:block w-full lg:w-64 shrink-0">
+              <div className="border border-border rounded-lg p-6 bg-card space-y-6">
+                <div className="space-y-4">
+                  <div className="h-4 bg-muted rounded w-24 overflow-hidden relative">
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent animate-[shimmer_2s_infinite]"></div>
+                  </div>
+                  <div className="space-y-2">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-8 bg-muted rounded w-full overflow-hidden relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent animate-[shimmer_2s_infinite]" style={{ animationDelay: `${i * 100}ms` }}></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </aside>
+            <div className="flex-1 min-w-0">
+              <div className="mb-6">
+                <div className="h-4 bg-muted rounded w-64 overflow-hidden relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent animate-[shimmer_2s_infinite]"></div>
+                </div>
+              </div>
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                {[1, 2, 3, 4].map((i) => (
+                  <RepositoryCardSkeleton key={i} />
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </main>
     )
   }
 
